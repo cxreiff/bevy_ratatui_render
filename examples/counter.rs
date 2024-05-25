@@ -1,9 +1,10 @@
+use bevy::utils::error;
 use bevy::{
     app::{AppExit, ScheduleRunnerPlugin},
     prelude::*,
     time::common_conditions::on_timer,
 };
-use bevy_rat::{ratatui_error_handler, ratatui_plugin, RatatuiEvent, RatatuiResource};
+use bevy_rat::{RatatuiEvent, RatatuiPlugin, RatatuiResource};
 use crossterm::event;
 use ratatui::{prelude::Stylize, widgets::Paragraph};
 use std::io::Result;
@@ -16,14 +17,14 @@ fn main() {
                 1.0 / 15.0,
             ))),
         )
-        .add_plugins(ratatui_plugin)
+        .add_plugins(RatatuiPlugin)
         .add_systems(Startup, count_setup)
         .add_systems(
             Update,
             count_update.run_if(on_timer(Duration::from_secs(1))),
         )
-        .add_systems(Update, ratatui_update.pipe(ratatui_error_handler))
-        .add_systems(Update, q_to_quit.pipe(ratatui_error_handler))
+        .add_systems(Update, ratatui_update.map(error))
+        .add_systems(Update, q_to_quit.map(error))
         .run();
 }
 
@@ -46,7 +47,7 @@ fn q_to_quit(
             if key_event.kind == event::KeyEventKind::Press
                 && key_event.code == event::KeyCode::Char('q')
             {
-                exit.send(AppExit);
+                exit.send(AppExit::Success);
             }
         }
     }

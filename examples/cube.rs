@@ -61,17 +61,26 @@ fn setup(
         Cube,
         PbrBundle {
             mesh: meshes.add(Cuboid::default()),
-            material: materials.add(StandardMaterial::default()),
+            material: materials.add(StandardMaterial {
+                base_color: bevy::prelude::Color::srgb_u8(100, 140, 180),
+                ..Default::default()
+            }),
             transform: Transform::default(),
             ..Default::default()
         },
     ));
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Plane3d::new(Vec3::new(0., 0., 1.), Vec2::new(8., 8.))),
+        material: materials.add(StandardMaterial::default()),
+        transform: Transform::from_xyz(0., 0., -6.),
+        ..Default::default()
+    });
     commands.spawn(PointLightBundle {
         point_light: PointLight {
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
+        transform: Transform::from_xyz(3.0, 4.0, 6.0),
         ..default()
     });
 }

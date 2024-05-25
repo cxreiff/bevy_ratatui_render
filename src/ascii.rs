@@ -2,7 +2,7 @@ use bevy::{core_pipeline::tonemapping::Tonemapping, prelude::*, render::renderer
 
 use crate::headless::{setup_render_target, ImageCopyPlugin, SceneController};
 
-const TEMP_DIMENSIONS: (u32, u32) = (512, 512);
+const TEMP_DIMENSIONS: (u32, u32) = (256, 256);
 
 pub struct AsciiPlugin;
 
@@ -31,7 +31,7 @@ fn setup(
         "main_scene".into(),
     );
     commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3., 3., 4.0).looking_at(Vec3::ZERO, Vec3::Z),
+        transform: Transform::from_xyz(3., 3., 3.0).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
             target: render_target,
