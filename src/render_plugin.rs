@@ -3,7 +3,7 @@ use bevy::{
     render::{render_graph::RenderGraph, Render, RenderApp, RenderSet},
 };
 
-use crate::render_image_copy::{
+use crate::render_headless::{
     image_copy_extract, receive_image_from_buffer, ImageCopy, ImageCopyNode, MainWorldReceiver,
     RatRenderState, RenderWorldSender,
 };

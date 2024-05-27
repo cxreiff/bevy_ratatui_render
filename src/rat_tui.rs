@@ -7,9 +7,9 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 
-pub type Tui = Terminal<CrosstermBackend<Stdout>>;
+pub type RatTui = Terminal<CrosstermBackend<Stdout>>;
 
-pub fn init() -> io::Result<Tui> {
+pub fn init() -> io::Result<RatTui> {
     execute!(stdout(), EnterAlternateScreen)?;
     enable_raw_mode()?;
     Terminal::new(CrosstermBackend::new(stdout()))
