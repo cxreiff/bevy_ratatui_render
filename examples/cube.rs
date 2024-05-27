@@ -2,23 +2,21 @@ use std::io;
 use std::time::Duration;
 
 use bevy::app::AppExit;
+use bevy::color::Color;
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::render::camera::RenderTarget;
 use bevy::utils::error;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
-use bevy_rat::ascii::AsciiPlugin;
-use bevy_rat::headless::receive_render_image;
-use bevy_rat::RatatuiEvent;
-use bevy_rat::{RatatuiPlugin, RatatuiResource};
+use bevy_rat::RatEvent;
+use bevy_rat::{rat_create, rat_receive, RatRenderPlugin, RatRenderWidget};
+use bevy_rat::{RatPlugin, RatResource};
 use crossterm::event;
-use image::{imageops, DynamicImage, GenericImageView};
-use ratatui::layout::{Alignment, Rect};
+use image::DynamicImage;
+use ratatui::layout::Alignment;
+use ratatui::style::Style;
 use ratatui::style::Stylize;
-use ratatui::style::{Color, Style};
 use ratatui::widgets::Block;
-use ratatui_image::{
-    picker::{Picker, ProtocolType},
-    Image, Resize,
-};
 
 #[derive(Component)]
 pub struct Cube;
@@ -38,21 +36,23 @@ fn main() {
                     exit_condition: bevy::window::ExitCondition::DontExit,
                     close_when_requested: false,
                 }),
-            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 30.0)),
+            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 60.0)),
             FrameTimeDiagnosticsPlugin,
-            AsciiPlugin,
-            RatatuiPlugin,
+            RatPlugin,
+            RatRenderPlugin::new(256, 256),
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
-        .add_systems(Startup, setup)
-        .add_systems(Update, receive_render_image.pipe(ratatui_render).map(error))
+        .insert_resource(ClearColor(Color::srgb_u8(0, 0, 0)))
+        .add_systems(Startup, rat_create.pipe(setup))
+        .add_systems(Update, rat_receive.pipe(rat_render).map(error))
         .add_systems(Update, handle_keys.map(error))
         .add_systems(Update, rotate_cube.after(handle_keys))
         .run();
 }
 
 fn setup(
+    In(render_target): In<RenderTarget>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -83,38 +83,29 @@ fn setup(
         transform: Transform::from_xyz(3.0, 4.0, 6.0),
         ..default()
     });
+    commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(3., 3., 3.0).looking_at(Vec3::ZERO, Vec3::Z),
+        tonemapping: Tonemapping::None,
+        camera: Camera {
+            target: render_target,
+            ..default()
+        },
+        ..default()
+    });
 }
 
-fn ratatui_render(
+fn rat_render(
     In(image): In<Option<DynamicImage>>,
-    mut rat: ResMut<RatatuiResource>,
+    mut rat: ResMut<RatResource>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
     if let Some(image) = image {
-        let mut picker = Picker::new((1, 2));
-        picker.protocol_type = ProtocolType::Halfblocks;
-
         rat.terminal.draw(|frame| {
             let mut block = Block::bordered()
-                .bg(Color::Rgb(0, 0, 0))
-                .border_style(Style::default().bg(Color::Rgb(0, 0, 0)));
-            let mut inner = block.inner(frame.size());
-
-            let Rect { width, height, .. } = frame.size();
-            let image = image.resize(
-                width as u32,
-                height as u32 * 2,
-                imageops::FilterType::Nearest,
-            );
-
-            let (image_width, image_height) = image.dimensions();
-            inner.x += inner.width.saturating_sub(image_width as u16) / 2;
-            inner.y += (inner.height * 2).saturating_sub(image_height as u16) / 4;
-
-            let img_as_blocks = picker
-                .new_protocol(image, frame.size(), Resize::Fit(None))
-                .unwrap();
+                .bg(ratatui::style::Color::Rgb(0, 0, 0))
+                .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)));
+            let inner = block.inner(frame.size());
 
             if flags.debug {
                 if let Some(value) = diagnostics
@@ -128,8 +119,7 @@ fn ratatui_render(
             }
 
             frame.render_widget(block, frame.size());
-
-            frame.render_widget(Image::new(img_as_blocks.as_ref()), inner);
+            frame.render_widget(RatRenderWidget::new(image), inner);
         })?;
     }
 
@@ -145,13 +135,13 @@ pub enum InputState {
 }
 
 pub fn handle_keys(
-    mut rat_events: EventReader<RatatuiEvent>,
+    mut rat_events: EventReader<RatEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
     mut input: ResMut<InputState>,
 ) -> io::Result<()> {
     for ev in rat_events.read() {
-        if let RatatuiEvent(event::Event::Key(key_event)) = ev {
+        if let RatEvent(event::Event::Key(key_event)) = ev {
             if key_event.kind == event::KeyEventKind::Press {
                 match key_event.code {
                     event::KeyCode::Char('q') => {
