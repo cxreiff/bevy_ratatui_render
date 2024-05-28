@@ -9,17 +9,14 @@ use std::sync::{
 use bevy::{
     prelude::*,
     render::{
-        camera::RenderTarget,
-        render_asset::RenderAssetUsages,
-        render_asset::RenderAssets,
+        render_asset::{RenderAssetUsages, RenderAssets},
         render_graph::{Node, NodeRunError, RenderGraphContext, RenderLabel},
         render_resource::{
             Buffer, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, Extent3d,
-            ImageCopyBuffer, ImageDataLayout, Maintain, MapMode,
+            ImageCopyBuffer, ImageDataLayout, Maintain, MapMode, TextureDimension, TextureFormat,
+            TextureUsages,
         },
-        render_resource::{TextureDimension, TextureFormat, TextureUsages},
-        renderer::RenderDevice,
-        renderer::{RenderContext, RenderQueue},
+        renderer::{RenderContext, RenderDevice, RenderQueue},
         texture::{BevyDefault, TextureFormatPixelInfo},
         Extract,
     },
@@ -29,9 +26,9 @@ use image::{DynamicImage, ImageBuffer};
 
 #[derive(Debug, Default, Resource)]
 pub struct RatRenderState {
-    built: bool,
-    width: u32,
-    height: u32,
+    pub built: bool,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl RatRenderState {
@@ -54,7 +51,7 @@ pub struct RenderWorldSender(pub Sender<Vec<u8>>);
 
 /// CPU-side image for saving
 #[derive(Component, Deref, DerefMut)]
-pub struct ImageToSave(Handle<Image>);
+pub struct ImageToSave(pub Handle<Image>);
 
 /// `ImageCopier` aggregator in `RenderWorld`
 #[derive(Clone, Default, Resource, Deref, DerefMut)]
@@ -245,108 +242,64 @@ pub fn receive_image_from_buffer(
     }
 }
 
-pub fn rat_create(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    render_device: Res<RenderDevice>,
-    mut rat_state: ResMut<RatRenderState>,
-) -> RenderTarget {
-    let size = Extent3d {
-        width: rat_state.width,
-        height: rat_state.height,
-        ..Default::default()
-    };
-
+pub fn create_render_textures(size: Extent3d) -> (Image, Image) {
     // This is the texture that will be rendered to.
-    let mut render_target_image = Image::new_fill(
+    let mut render_texture = Image::new_fill(
         size,
         TextureDimension::D2,
         &[0; 4],
         TextureFormat::bevy_default(),
         RenderAssetUsages::default(),
     );
-    render_target_image.texture_descriptor.usage |=
+    render_texture.texture_descriptor.usage |=
         TextureUsages::COPY_SRC | TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING;
-    let render_target_image_handle = images.add(render_target_image);
 
     // This is the texture that will be copied to.
-    let cpu_image = Image::new_fill(
+    let cpu_texture = Image::new_fill(
         size,
         TextureDimension::D2,
         &[0; 4],
         TextureFormat::bevy_default(),
         RenderAssetUsages::default(),
     );
-    let cpu_image_handle = images.add(cpu_image);
 
-    commands.spawn(ImageCopier::new(
-        render_target_image_handle.clone(),
-        size,
-        &render_device,
-    ));
-
-    commands.spawn(ImageToSave(cpu_image_handle));
-
-    rat_state.built = true;
-
-    RenderTarget::Image(render_target_image_handle)
+    (render_texture, cpu_texture)
 }
 
 // Takes from channel image content sent from render world and saves it to disk
-pub fn rat_receive(
-    images_to_save: Query<&ImageToSave>,
-    receiver: Res<MainWorldReceiver>,
-    mut images: ResMut<Assets<Image>>,
-    rat_state: ResMut<RatRenderState>,
-) -> Option<DynamicImage> {
-    if rat_state.built {
-        // We don't want to block the main world on this,
-        // so we use try_recv which attempts to receive without blocking
-        let mut image_data = Vec::new();
-        while let Ok(data) = receiver.try_recv() {
-            // image generation could be faster than saving to fs,
-            // that's why use only last of them
-            image_data = data;
-        }
-        if !image_data.is_empty() {
-            if let Some(image) = images_to_save.iter().next() {
-                // Fill correct data from channel to image
-                let img_bytes = images.get_mut(image.id()).unwrap();
+pub fn parse_image_data(
+    images: &mut ResMut<Assets<Image>>,
+    image_to_save: &ImageToSave,
+    image_data: Vec<u8>,
+) -> DynamicImage {
+    // Fill correct data from channel to image
+    let img_bytes = images.get_mut(image_to_save.id()).unwrap();
 
-                // We need to ensure that this works regardless of the image dimensions
-                // If the image became wider when copying from the texture to the buffer,
-                // then the data is reduced to its original size when copying from the buffer to the image.
-                let row_bytes =
-                    img_bytes.width() as usize * img_bytes.texture_descriptor.format.pixel_size();
-                let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
-                if row_bytes == aligned_row_bytes {
-                    img_bytes.data.clone_from(&image_data);
-                } else {
-                    // shrink data to original image size
-                    img_bytes.data = image_data
-                        .chunks(aligned_row_bytes)
-                        .take(img_bytes.height() as usize)
-                        .flat_map(|row| &row[..row_bytes.min(row.len())])
-                        .cloned()
-                        .collect();
-                }
-
-                // Create RGBA Image Buffer
-                let img = match img_bytes.clone().try_into_dynamic() {
-                    Ok(img) => img,
-                    Err(e) => panic!("Failed to create image buffer {e:?}"),
-                };
-
-                let img = img.to_rgb8();
-                let (width, height) = img.dimensions();
-                let img = DynamicImage::ImageRgb8(
-                    ImageBuffer::from_raw(width, height, img.into_raw()).expect("failed"),
-                );
-
-                return Some(img);
-            }
-        }
+    // We need to ensure that this works regardless of the image dimensions
+    // If the image became wider when copying from the texture to the buffer,
+    // then the data is reduced to its original size when copying from the buffer to the image.
+    let row_bytes = img_bytes.width() as usize * img_bytes.texture_descriptor.format.pixel_size();
+    let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
+    if row_bytes == aligned_row_bytes {
+        img_bytes.data.clone_from(&image_data);
+    } else {
+        // shrink data to original image size
+        img_bytes.data = image_data
+            .chunks(aligned_row_bytes)
+            .take(img_bytes.height() as usize)
+            .flat_map(|row| &row[..row_bytes.min(row.len())])
+            .cloned()
+            .collect();
     }
 
-    None
+    // Create RGBA Image Buffer
+    let img = match img_bytes.clone().try_into_dynamic() {
+        Ok(img) => img,
+        Err(e) => panic!("Failed to create image buffer {e:?}"),
+    };
+
+    let img = img.to_rgb8();
+    let (width, height) = img.dimensions();
+
+    DynamicImage::ImageRgb8(ImageBuffer::from_raw(width, height, img.into_raw()).expect("failed"))
 }
