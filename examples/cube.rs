@@ -7,11 +7,10 @@ use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::utils::error;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
-use bevy_rat::{rat_create, rat_receive, RatRenderPlugin, RatRenderWidget};
+use bevy_rat::{rat_create, rat_receive, RatReceiveOutput, RatRenderPlugin, RatRenderWidget};
 use bevy_rat::{RatCreateOutput, RatEvent};
 use bevy_rat::{RatPlugin, RatResource};
 use crossterm::event;
-use image::DynamicImage;
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
@@ -43,27 +42,15 @@ fn main() {
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
         .insert_resource(ClearColor(Color::srgb_u8(0, 0, 0)))
-        .add_systems(Startup, rat_create.pipe(setup_camera))
-        .add_systems(Startup, setup)
+        .add_systems(Startup, scene_setup)
+        .add_systems(Startup, rat_create.pipe(rat_camera))
         .add_systems(Update, rat_receive.pipe(rat_print).map(error))
         .add_systems(Update, handle_keys.map(error))
         .add_systems(Update, rotate_cube.after(handle_keys))
         .run();
 }
 
-fn setup_camera(In(target): In<RatCreateOutput>, mut commands: Commands) {
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3., 3., 3.0).looking_at(Vec3::ZERO, Vec3::Z),
-        tonemapping: Tonemapping::None,
-        camera: Camera {
-            target,
-            ..default()
-        },
-        ..default()
-    });
-}
-
-fn setup(
+fn scene_setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -96,8 +83,20 @@ fn setup(
     });
 }
 
+fn rat_camera(In(target): In<RatCreateOutput>, mut commands: Commands) {
+    commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(3., 3., 3.0).looking_at(Vec3::ZERO, Vec3::Z),
+        tonemapping: Tonemapping::None,
+        camera: Camera {
+            target,
+            ..default()
+        },
+        ..default()
+    });
+}
+
 fn rat_print(
-    In(image): In<Option<DynamicImage>>,
+    In(image): In<RatReceiveOutput>,
     mut rat: ResMut<RatResource>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
