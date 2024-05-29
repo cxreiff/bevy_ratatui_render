@@ -20,13 +20,15 @@ impl Plugin for RatPlugin {
 #[derive(Resource)]
 pub struct RatResource {
     pub terminal: Terminal<CrosstermBackend<Stdout>>,
+    pub kitty: bool,
 }
 
 fn ratatui_startup(mut commands: Commands) -> io::Result<()> {
     rat_tui::init_panic_hooks();
     let mut terminal = rat_tui::init()?;
+    let kitty = rat_tui::init_kitty_protocol().is_ok();
     terminal.clear()?;
-    commands.insert_resource(RatResource { terminal });
+    commands.insert_resource(RatResource { terminal, kitty });
 
     Ok(())
 }

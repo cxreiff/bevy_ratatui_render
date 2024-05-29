@@ -6,6 +6,7 @@ use bevy::color::Color;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::utils::error;
+use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
 use bevy_rat::{rat_create, rat_receive, RatReceiveOutput, RatRenderPlugin, RatRenderWidget};
 use bevy_rat::{RatCreateOutput, RatEvent};
@@ -31,7 +32,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     primary_window: None,
-                    exit_condition: bevy::window::ExitCondition::DontExit,
+                    exit_condition: ExitCondition::DontExit,
                     close_when_requested: false,
                 }),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 60.0)),
@@ -102,6 +103,7 @@ fn rat_print(
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
     if let Some(image) = image {
+        let kitty = rat.kitty;
         rat.terminal.draw(|frame| {
             let mut block = Block::bordered()
                 .bg(ratatui::style::Color::Rgb(0, 0, 0))
@@ -117,6 +119,14 @@ fn rat_print(
                         .title_top(format!("{value:.0}"))
                         .title_alignment(Alignment::Right);
                 }
+
+                block = block
+                    .title_top(if kitty {
+                        "kitty enabled"
+                    } else {
+                        "kitty disabled"
+                    })
+                    .title_alignment(Alignment::Right);
             }
 
             frame.render_widget(block, frame.size());
@@ -143,8 +153,8 @@ pub fn handle_keys(
 ) -> io::Result<()> {
     for ev in rat_events.read() {
         if let RatEvent(event::Event::Key(key_event)) = ev {
-            if key_event.kind == event::KeyEventKind::Press {
-                match key_event.code {
+            match key_event.kind {
+                event::KeyEventKind::Press | event::KeyEventKind::Repeat => match key_event.code {
                     event::KeyCode::Char('q') => {
                         exit.send(AppExit::Success);
                     }
@@ -162,7 +172,20 @@ pub fn handle_keys(
                     }
 
                     _ => {}
-                };
+                },
+                event::KeyEventKind::Release => match key_event.code {
+                    event::KeyCode::Left => {
+                        if let InputState::Left(_) = *input {
+                            *input = InputState::None;
+                        }
+                    }
+                    event::KeyCode::Right => {
+                        if let InputState::Right(_) = *input {
+                            *input = InputState::None;
+                        }
+                    }
+                    _ => {}
+                },
             }
         }
     }
