@@ -11,7 +11,7 @@ use crate::{
         create_render_textures, parse_image_data, ImageCopier, ImageToSave, MainWorldReceiver,
         RatRenderState,
     },
-    RatRenderWidget, RatResource,
+    RatContext, RatRenderWidget,
 };
 
 pub type RatReceiveOutput = Option<DynamicImage>;
@@ -66,9 +66,9 @@ pub fn rat_receive(
     None
 }
 
-pub fn rat_print(In(image): In<RatReceiveOutput>, mut rat: ResMut<RatResource>) -> io::Result<()> {
+pub fn rat_print(In(image): In<RatReceiveOutput>, mut rat: ResMut<RatContext>) -> io::Result<()> {
     if let Some(image) = image {
-        rat.terminal.draw(|frame| {
+        rat.draw(|frame| {
             frame.render_widget(RatRenderWidget::new(image), frame.size());
         })?;
     }

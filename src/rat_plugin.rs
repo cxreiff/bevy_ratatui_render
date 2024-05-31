@@ -12,31 +12,39 @@ impl Plugin for RatPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<RatEvent>()
             .add_systems(Startup, ratatui_startup.map(error))
-            .add_systems(Update, ratatui_input.map(error))
-            .add_systems(Last, ratatui_cleanup.map(error));
+            .add_systems(Update, ratatui_input.map(error));
     }
 }
 
-#[derive(Resource)]
-pub struct RatResource {
+#[derive(Resource, Deref, DerefMut)]
+pub struct RatContext {
+    #[deref]
     pub terminal: Terminal<CrosstermBackend<Stdout>>,
-    pub kitty: bool,
+    pub kitty_enabled: bool,
+}
+
+impl RatContext {
+    pub fn init() -> io::Result<Self> {
+        rat_tui::init_panic_hooks();
+        let mut terminal = rat_tui::init()?;
+        let kitty_enabled = rat_tui::init_kitty_protocol().is_ok();
+        terminal.clear()?;
+
+        Ok(RatContext {
+            terminal,
+            kitty_enabled,
+        })
+    }
+}
+
+impl Drop for RatContext {
+    fn drop(&mut self) {
+        rat_tui::restore().unwrap();
+    }
 }
 
 fn ratatui_startup(mut commands: Commands) -> io::Result<()> {
-    rat_tui::init_panic_hooks();
-    let mut terminal = rat_tui::init()?;
-    let kitty = rat_tui::init_kitty_protocol().is_ok();
-    terminal.clear()?;
-    commands.insert_resource(RatResource { terminal, kitty });
-
-    Ok(())
-}
-
-fn ratatui_cleanup(mut events: EventReader<AppExit>) -> io::Result<()> {
-    for _ in events.read() {
-        rat_tui::restore()?;
-    }
+    commands.insert_resource(RatContext::init()?);
 
     Ok(())
 }

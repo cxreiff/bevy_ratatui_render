@@ -11,9 +11,7 @@ use crossterm::{
 use crossterm::{queue, terminal};
 use ratatui::prelude::*;
 
-pub type RatTui = Terminal<CrosstermBackend<Stdout>>;
-
-pub fn init() -> io::Result<RatTui> {
+pub fn init() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
     execute!(stdout(), EnterAlternateScreen)?;
     enable_raw_mode()?;
     Terminal::new(CrosstermBackend::new(stdout()))

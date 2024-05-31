@@ -4,7 +4,7 @@ use bevy::{
     prelude::*,
     time::common_conditions::on_timer,
 };
-use bevy_rat::{RatEvent, RatPlugin, RatResource};
+use bevy_rat::{RatContext, RatEvent, RatPlugin};
 use crossterm::event;
 use ratatui::{prelude::Stylize, widgets::Paragraph};
 use std::io::Result;
@@ -23,13 +23,13 @@ fn main() {
             Update,
             count_update.run_if(on_timer(Duration::from_secs(1))),
         )
-        .add_systems(Update, rat_update.map(error))
+        .add_systems(Update, rat_print.map(error))
         .add_systems(Update, q_to_quit.map(error))
         .run();
 }
 
-fn rat_update(mut rat: ResMut<RatResource>, count: Res<Count>) -> Result<()> {
-    rat.terminal.draw(|frame| {
+fn rat_print(mut rat: ResMut<RatContext>, count: Res<Count>) -> Result<()> {
+    rat.draw(|frame| {
         let message = format!("count: {} ('q' to quit)", count.count);
         let area = frame.size();
         frame.render_widget(Paragraph::new(message).white().on_blue(), area);

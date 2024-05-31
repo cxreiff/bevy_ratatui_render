@@ -9,8 +9,8 @@ use bevy::utils::error;
 use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
 use bevy_rat::{rat_create, rat_receive, RatReceiveOutput, RatRenderPlugin, RatRenderWidget};
+use bevy_rat::{RatContext, RatPlugin};
 use bevy_rat::{RatCreateOutput, RatEvent};
-use bevy_rat::{RatPlugin, RatResource};
 use crossterm::event;
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
@@ -98,13 +98,13 @@ fn rat_camera(In(target): In<RatCreateOutput>, mut commands: Commands) {
 
 fn rat_print(
     In(image): In<RatReceiveOutput>,
-    mut rat: ResMut<RatResource>,
+    mut rat: ResMut<RatContext>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
     if let Some(image) = image {
-        let kitty = rat.kitty;
-        rat.terminal.draw(|frame| {
+        let kitty_enabled = rat.kitty_enabled;
+        rat.draw(|frame| {
             let mut block = Block::bordered()
                 .bg(ratatui::style::Color::Rgb(0, 0, 0))
                 .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)));
@@ -121,7 +121,7 @@ fn rat_print(
                 }
 
                 block = block
-                    .title_top(if kitty {
+                    .title_top(if kitty_enabled {
                         "kitty enabled"
                     } else {
                         "kitty disabled"
