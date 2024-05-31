@@ -6,6 +6,6 @@ mod render_utils;
 mod render_widget;
 
 pub use rat_plugin::{RatContext, RatEvent, RatPlugin};
-pub use render_plugin::RatRenderPlugin;
-pub use render_utils::{rat_create, rat_print, rat_receive, RatCreateOutput, RatReceiveOutput};
+pub use render_plugin::{RatRenderContext, RatRenderPlugin};
+pub use render_utils::{rat_print, rat_receive, RatCreateOutput, RatReceiveOutput};
 pub use render_widget::RatRenderWidget;

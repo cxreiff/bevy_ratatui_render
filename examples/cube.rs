@@ -5,12 +5,13 @@ use bevy::app::AppExit;
 use bevy::color::Color;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::render::camera::RenderTarget;
 use bevy::utils::error;
 use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
-use bevy_rat::{rat_create, rat_receive, RatReceiveOutput, RatRenderPlugin, RatRenderWidget};
+use bevy_rat::RatEvent;
 use bevy_rat::{RatContext, RatPlugin};
-use bevy_rat::{RatCreateOutput, RatEvent};
+use bevy_rat::{RatRenderContext, RatRenderPlugin, RatRenderWidget};
 use crossterm::event;
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
@@ -44,8 +45,7 @@ fn main() {
         .insert_resource(InputState::Idle)
         .insert_resource(ClearColor(Color::srgb_u8(0, 0, 0)))
         .add_systems(Startup, scene_setup)
-        .add_systems(Startup, rat_create.pipe(rat_camera))
-        .add_systems(Update, rat_receive.pipe(rat_print).map(error))
+        .add_systems(Update, rat_print.map(error))
         .add_systems(Update, handle_keys.map(error))
         .add_systems(Update, rotate_cube.after(handle_keys))
         .run();
@@ -55,6 +55,7 @@ fn scene_setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    rat_render_context: Res<RatRenderContext>,
 ) {
     commands.spawn((
         Cube,
@@ -82,14 +83,11 @@ fn scene_setup(
         transform: Transform::from_xyz(3.0, 4.0, 6.0),
         ..default()
     });
-}
-
-fn rat_camera(In(target): In<RatCreateOutput>, mut commands: Commands) {
     commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(3., 3., 3.0).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target,
+            target: RenderTarget::Image(rat_render_context.camera_target.clone()),
             ..default()
         },
         ..default()
@@ -97,12 +95,12 @@ fn rat_camera(In(target): In<RatCreateOutput>, mut commands: Commands) {
 }
 
 fn rat_print(
-    In(image): In<RatReceiveOutput>,
     mut rat: ResMut<RatContext>,
+    rat_render: Res<RatRenderContext>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
-    if let Some(image) = image {
+    if let Some(image) = rat_render.rendered_image.clone() {
         let kitty_enabled = rat.kitty_enabled;
         rat.draw(|frame| {
             let mut block = Block::bordered()

@@ -1,14 +1,18 @@
 use bevy::{
     prelude::*,
-    render::{render_graph::RenderGraph, Render, RenderApp, RenderSet},
+    render::{
+        render_graph::RenderGraph, render_resource::Extent3d, renderer::RenderDevice, Render,
+        RenderApp, RenderSet,
+    },
     utils::error,
 };
+use image::DynamicImage;
 
 use crate::{
     rat_print, rat_receive,
     render_headless::{
-        image_copy_extract, receive_image_from_buffer, ImageCopy, ImageCopyNode, MainWorldReceiver,
-        RatRenderState, RenderWorldSender,
+        create_render_textures, image_copy_extract, receive_image_from_buffer, ImageCopier,
+        ImageCopy, ImageCopyNode, ImageToSave, MainWorldReceiver, RenderWorldSender,
     },
 };
 
@@ -45,7 +49,9 @@ impl Plugin for RatRenderPlugin {
         let (s, r) = crossbeam_channel::unbounded();
 
         app.insert_resource(MainWorldReceiver(r))
-            .insert_resource(RatRenderState::new(self.width, self.height));
+            .insert_resource(RatRenderConfig::new(self.width, self.height))
+            .add_systems(PreStartup, setup_rendering)
+            .add_systems(Update, rat_receive);
 
         let render_app = app.sub_app_mut(RenderApp);
 
@@ -77,4 +83,51 @@ impl RatRenderPlugin {
         self.print_full_terminal = true;
         self
     }
+}
+
+#[derive(Resource)]
+pub struct RatRenderConfig {
+    width: u32,
+    height: u32,
+}
+
+impl RatRenderConfig {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct RatRenderContext {
+    pub camera_target: Handle<Image>,
+    pub rendered_image: Option<DynamicImage>,
+}
+
+fn setup_rendering(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    rat_render_config: ResMut<RatRenderConfig>,
+    render_device: Res<RenderDevice>,
+) {
+    let size = Extent3d {
+        width: rat_render_config.width,
+        height: rat_render_config.height,
+        ..Default::default()
+    };
+
+    let (render_texture, cpu_texture) = create_render_textures(size);
+    let render_handle = images.add(render_texture);
+    let cpu_handle = images.add(cpu_texture);
+
+    commands.spawn(ImageCopier::new(
+        render_handle.clone(),
+        size,
+        &render_device,
+    ));
+    commands.spawn(ImageToSave(cpu_handle));
+
+    commands.insert_resource(RatRenderContext {
+        camera_target: render_handle,
+        rendered_image: None,
+    });
 }

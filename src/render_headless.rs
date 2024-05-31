@@ -24,23 +24,6 @@ use bevy::{
 use crossbeam_channel::{Receiver, Sender};
 use image::{DynamicImage, ImageBuffer};
 
-#[derive(Debug, Default, Resource)]
-pub struct RatRenderState {
-    pub built: bool,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl RatRenderState {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            built: false,
-            width,
-            height,
-        }
-    }
-}
-
 /// This will receive asynchronously any data sent from the render world
 #[derive(Resource, Deref)]
 pub struct MainWorldReceiver(pub Receiver<Vec<u8>>);
