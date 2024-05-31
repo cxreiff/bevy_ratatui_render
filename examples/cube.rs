@@ -5,13 +5,12 @@ use bevy::app::AppExit;
 use bevy::color::Color;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
-use bevy::render::camera::RenderTarget;
 use bevy::utils::error;
 use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
 use bevy_rat::RatEvent;
 use bevy_rat::{RatContext, RatPlugin};
-use bevy_rat::{RatRenderContext, RatRenderPlugin, RatRenderWidget};
+use bevy_rat::{RatRenderContext, RatRenderPlugin};
 use crossterm::event;
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
@@ -55,7 +54,7 @@ fn scene_setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    rat_render_context: Res<RatRenderContext>,
+    rat_render: Res<RatRenderContext>,
 ) {
     commands.spawn((
         Cube,
@@ -87,7 +86,7 @@ fn scene_setup(
         transform: Transform::from_xyz(3., 3., 3.0).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target: RenderTarget::Image(rat_render_context.camera_target.clone()),
+            target: rat_render.target(),
             ..default()
         },
         ..default()
@@ -100,37 +99,35 @@ fn rat_print(
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
-    if let Some(image) = rat_render.rendered_image.clone() {
-        let kitty_enabled = rat.kitty_enabled;
-        rat.draw(|frame| {
-            let mut block = Block::bordered()
-                .bg(ratatui::style::Color::Rgb(0, 0, 0))
-                .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)));
-            let inner = block.inner(frame.size());
+    let kitty_enabled = rat.kitty_enabled;
+    rat.draw(|frame| {
+        let mut block = Block::bordered()
+            .bg(ratatui::style::Color::Rgb(0, 0, 0))
+            .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)));
+        let inner = block.inner(frame.size());
 
-            if flags.debug {
-                if let Some(value) = diagnostics
-                    .get(&FrameTimeDiagnosticsPlugin::FPS)
-                    .and_then(|fps| fps.smoothed())
-                {
-                    block = block
-                        .title_top(format!("{value:.0}"))
-                        .title_alignment(Alignment::Right);
-                }
-
+        if flags.debug {
+            if let Some(value) = diagnostics
+                .get(&FrameTimeDiagnosticsPlugin::FPS)
+                .and_then(|fps| fps.smoothed())
+            {
                 block = block
-                    .title_top(if kitty_enabled {
-                        "kitty enabled"
-                    } else {
-                        "kitty disabled"
-                    })
+                    .title_top(format!("{value:.0}"))
                     .title_alignment(Alignment::Right);
             }
 
-            frame.render_widget(block, frame.size());
-            frame.render_widget(RatRenderWidget::new(image), inner);
-        })?;
-    }
+            block = block
+                .title_top(if kitty_enabled {
+                    "kitty enabled"
+                } else {
+                    "kitty disabled"
+                })
+                .title_alignment(Alignment::Right);
+        }
+
+        frame.render_widget(block, frame.size());
+        frame.render_widget(rat_render.widget(), inner);
+    })?;
 
     Ok(())
 }

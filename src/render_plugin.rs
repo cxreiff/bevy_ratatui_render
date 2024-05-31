@@ -1,19 +1,17 @@
 use bevy::{
     prelude::*,
-    render::{
-        render_graph::RenderGraph, render_resource::Extent3d, renderer::RenderDevice, Render,
-        RenderApp, RenderSet,
-    },
+    render::{camera::RenderTarget, render_graph::RenderGraph, Render, RenderApp, RenderSet},
     utils::error,
 };
 use image::DynamicImage;
 
 use crate::{
-    rat_print, rat_receive,
     render_headless::{
-        create_render_textures, image_copy_extract, receive_image_from_buffer, ImageCopier,
-        ImageCopy, ImageCopyNode, ImageToSave, MainWorldReceiver, RenderWorldSender,
+        image_copy_extract, receive_image_from_buffer, ImageCopy, ImageCopyNode, MainWorldReceiver,
+        RenderWorldSender,
     },
+    render_systems::{rat_create, rat_print, rat_receive},
+    RatRenderWidget,
 };
 
 /// basic setup:
@@ -21,16 +19,16 @@ use crate::{
 /// ```
 /// app.add_plugins((
 ///     RatPlugin,
-///     RatRenderPlugin::new(1024, 1024).print_full_terminal(),
+///     RatRenderPlugin::new(512, 512).print_full_terminal(),
 /// ))
-/// .add_systems(Startup, rat_create.pipe(setup_camera))
+/// .add_systems(Startup, setup_camera)
 ///
 /// ...
 ///
-/// fn setup_camera(In(target): In<RatCreateOutput>, mut commands: Commands) {
+/// fn setup_camera(mut commands: Commands, rat_render: Res<RatRenderContext>) {
 ///     commands.spawn(Camera3dBundle {
 ///         camera: Camera {
-///             target,
+///             target: rat_render.target(),
 ///             ..default()
 ///         },
 ///         ..default()
@@ -50,8 +48,8 @@ impl Plugin for RatRenderPlugin {
 
         app.insert_resource(MainWorldReceiver(r))
             .insert_resource(RatRenderConfig::new(self.width, self.height))
-            .add_systems(PreStartup, setup_rendering)
-            .add_systems(Update, rat_receive);
+            .add_systems(PreStartup, rat_create)
+            .add_systems(First, rat_receive);
 
         let render_app = app.sub_app_mut(RenderApp);
 
@@ -65,7 +63,7 @@ impl Plugin for RatRenderPlugin {
             .add_systems(Render, receive_image_from_buffer.after(RenderSet::Render));
 
         if self.print_full_terminal {
-            app.add_systems(Update, rat_receive.pipe(rat_print).map(error));
+            app.add_systems(Update, rat_print.map(error));
         }
     }
 }
@@ -87,8 +85,8 @@ impl RatRenderPlugin {
 
 #[derive(Resource)]
 pub struct RatRenderConfig {
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl RatRenderConfig {
@@ -99,35 +97,16 @@ impl RatRenderConfig {
 
 #[derive(Resource, Default)]
 pub struct RatRenderContext {
-    pub camera_target: Handle<Image>,
+    pub camera_target: RenderTarget,
     pub rendered_image: Option<DynamicImage>,
 }
 
-fn setup_rendering(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    rat_render_config: ResMut<RatRenderConfig>,
-    render_device: Res<RenderDevice>,
-) {
-    let size = Extent3d {
-        width: rat_render_config.width,
-        height: rat_render_config.height,
-        ..Default::default()
-    };
+impl RatRenderContext {
+    pub fn target(&self) -> RenderTarget {
+        self.camera_target.clone()
+    }
 
-    let (render_texture, cpu_texture) = create_render_textures(size);
-    let render_handle = images.add(render_texture);
-    let cpu_handle = images.add(cpu_texture);
-
-    commands.spawn(ImageCopier::new(
-        render_handle.clone(),
-        size,
-        &render_device,
-    ));
-    commands.spawn(ImageToSave(cpu_handle));
-
-    commands.insert_resource(RatRenderContext {
-        camera_target: render_handle,
-        rendered_image: None,
-    });
+    pub fn widget(&self) -> RatRenderWidget {
+        RatRenderWidget::new(&self.rendered_image)
+    }
 }
