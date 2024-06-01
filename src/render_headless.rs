@@ -1,4 +1,4 @@
-// MOSTLY RIPPED FROM BEVY `headless_renderer.rs` EXAMPLE BY @bugsweeper
+// ADAPTED FROM BEVY `headless_renderer.rs` EXAMPLE BY @bugsweeper
 // (https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs)
 
 use std::sync::{
@@ -24,21 +24,21 @@ use bevy::{
 };
 use crossbeam_channel::{Receiver, Sender};
 
-use crate::{render_plugin::RatRenderConfig, RatRenderContext};
+use crate::RatRenderContext;
 
-/// This will receive asynchronously any data sent from the render world
+/// Receives data asynchronously from the render world
 #[derive(Resource, Deref)]
 pub struct MainWorldReceiver(pub Receiver<Vec<u8>>);
 
-/// This will send asynchronously any data to the main world
+/// Sends data asynchronously to the main world
 #[derive(Resource, Deref)]
 pub struct RenderWorldSender(pub Sender<Vec<u8>>);
 
-/// `ImageCopier` aggregator in `RenderWorld`
+/// `ImageCopySource` aggregator in `RenderWorld`
 #[derive(Clone, Default, Resource, Deref, DerefMut)]
 pub struct ImageCopySources(pub Vec<ImageCopySource>);
 
-/// Used by `ImageCopyDriver` for copying from render target to buffer
+/// Used by `ImageCopy` for copying from render target to buffer
 #[derive(Clone, Component)]
 pub struct ImageCopySource {
     buffer: Buffer,
@@ -74,7 +74,7 @@ impl ImageCopySource {
     }
 }
 
-/// `RenderGraph` label for `ImageCopyDriver`
+/// `RenderGraph` label for `ImageCopy`
 #[derive(Debug, PartialEq, Eq, Clone, Hash, RenderLabel)]
 pub struct ImageCopy;
 
@@ -147,7 +147,7 @@ impl Node for ImageCopyNode {
     }
 }
 
-/// Extracting `ImageCopier`s into render world, because `ImageCopyDriver` accesses them
+/// Extracts `ImageCopySource`s into render world, because `ImageCopy` accesses them
 pub fn image_copy_source_extract_system(
     mut commands: Commands,
     image_copy_sources: Extract<Query<&ImageCopySource>>,
@@ -160,7 +160,54 @@ pub fn image_copy_source_extract_system(
     ));
 }
 
-/// runs in render world after Render stage to send image from buffer via channel (receiver is in main world)
+/// Creates textures and initializes RatRenderContext
+pub fn initialize_ratatui_render_context_system_generator(
+    width: u32,
+    height: u32,
+) -> impl FnMut(Commands, ResMut<Assets<Image>>, Res<RenderDevice>) {
+    move |mut commands, mut images, render_device| {
+        let size = Extent3d {
+            width,
+            height,
+            ..Default::default()
+        };
+
+        // This is the texture that will be rendered to.
+        let mut render_texture = Image::new_fill(
+            size,
+            TextureDimension::D2,
+            &[0; 4],
+            TextureFormat::bevy_default(),
+            RenderAssetUsages::default(),
+        );
+        render_texture.texture_descriptor.usage |= TextureUsages::COPY_SRC
+            | TextureUsages::RENDER_ATTACHMENT
+            | TextureUsages::TEXTURE_BINDING;
+
+        // This is the texture that will be copied to.
+        let cpu_texture = Image::new_fill(
+            size,
+            TextureDimension::D2,
+            &[0; 4],
+            TextureFormat::bevy_default(),
+            RenderAssetUsages::default(),
+        );
+        let render_handle = images.add(render_texture);
+
+        commands.spawn(ImageCopySource::new(
+            render_handle.clone(),
+            size,
+            &render_device,
+        ));
+
+        commands.insert_resource(RatRenderContext {
+            camera_target: RenderTarget::Image(render_handle),
+            rendered_image: cpu_texture,
+        });
+    }
+}
+
+/// Sends image from buffer in render world to main world via channel
 pub fn send_rendered_image_system(
     image_copy_sources: Res<ImageCopySources>,
     render_device: Res<RenderDevice>,
@@ -229,52 +276,7 @@ pub fn send_rendered_image_system(
     }
 }
 
-pub fn initialize_ratatui_render_context_system(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    rat_render_config: ResMut<RatRenderConfig>,
-    render_device: Res<RenderDevice>,
-) {
-    let size = Extent3d {
-        width: rat_render_config.width,
-        height: rat_render_config.height,
-        ..Default::default()
-    };
-
-    // This is the texture that will be rendered to.
-    let mut render_texture = Image::new_fill(
-        size,
-        TextureDimension::D2,
-        &[0; 4],
-        TextureFormat::bevy_default(),
-        RenderAssetUsages::default(),
-    );
-    render_texture.texture_descriptor.usage |=
-        TextureUsages::COPY_SRC | TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING;
-
-    // This is the texture that will be copied to.
-    let cpu_texture = Image::new_fill(
-        size,
-        TextureDimension::D2,
-        &[0; 4],
-        TextureFormat::bevy_default(),
-        RenderAssetUsages::default(),
-    );
-    let render_handle = images.add(render_texture);
-
-    commands.spawn(ImageCopySource::new(
-        render_handle.clone(),
-        size,
-        &render_device,
-    ));
-
-    commands.insert_resource(RatRenderContext {
-        camera_target: RenderTarget::Image(render_handle),
-        rendered_image: cpu_texture,
-    });
-}
-
-// Takes from channel image content sent from render world and saves it to disk
+// Receives image in main world from render world and updates RatRenderContext
 pub fn receive_rendered_image_system(
     receiver: Res<MainWorldReceiver>,
     mut rat_render_context: ResMut<RatRenderContext>,

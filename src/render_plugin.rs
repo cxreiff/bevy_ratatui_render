@@ -8,13 +8,19 @@ use bevy::{
 
 use crate::{
     render_headless::{
-        image_copy_source_extract_system, initialize_ratatui_render_context_system,
+        image_copy_source_extract_system, initialize_ratatui_render_context_system_generator,
         receive_rendered_image_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
         MainWorldReceiver, RenderWorldSender,
     },
     RatContext, RatRenderWidget,
 };
 
+/// Sets up headless rendering and makes the `RatRenderContext` resource available
+/// to use in your camera and ratatui draw loop.
+///
+/// Use `print_full_terminal()` to add a minimal ratatui draw loop that just draws
+/// your bevy scene to the full terminal window.
+///
 /// basic setup:
 ///
 /// ```
@@ -43,13 +49,30 @@ pub struct RatRenderPlugin {
     print_full_terminal: bool,
 }
 
+impl RatRenderPlugin {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            width,
+            height,
+            ..default()
+        }
+    }
+
+    pub fn print_full_terminal(mut self) -> Self {
+        self.print_full_terminal = true;
+        self
+    }
+}
+
 impl Plugin for RatRenderPlugin {
     fn build(&self, app: &mut App) {
         let (s, r) = crossbeam_channel::unbounded();
 
         app.insert_resource(MainWorldReceiver(r))
-            .insert_resource(RatRenderConfig::new(self.width, self.height))
-            .add_systems(PreStartup, initialize_ratatui_render_context_system)
+            .add_systems(
+                PreStartup,
+                initialize_ratatui_render_context_system_generator(self.width, self.height),
+            )
             .add_systems(First, receive_rendered_image_system);
 
         let render_app = app.sub_app_mut(RenderApp);
@@ -69,33 +92,13 @@ impl Plugin for RatRenderPlugin {
     }
 }
 
-impl RatRenderPlugin {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            width,
-            height,
-            ..default()
-        }
-    }
-
-    pub fn print_full_terminal(mut self) -> Self {
-        self.print_full_terminal = true;
-        self
-    }
-}
-
-#[derive(Resource)]
-pub struct RatRenderConfig {
-    pub width: u32,
-    pub height: u32,
-}
-
-impl RatRenderConfig {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
-}
-
+/// Resource containing a bevy camera render target and an image that will be updated each frame
+/// with the results of whatever is rendered to that target.
+///
+/// `target()` to clone the render target.
+///
+/// `widget()` to generate a ratatui widget that will draw whatever was rendered to the render
+/// target in the ratatui frame.
 #[derive(Resource, Default)]
 pub struct RatRenderContext {
     pub camera_target: RenderTarget,
@@ -112,7 +115,7 @@ impl RatRenderContext {
     }
 }
 
-pub fn print_full_terminal_system(
+fn print_full_terminal_system(
     mut rat: ResMut<RatContext>,
     rat_render_context: Res<RatRenderContext>,
 ) -> io::Result<()> {

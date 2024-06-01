@@ -24,8 +24,8 @@ impl<'a> Widget for RatRenderWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let RatRenderWidget { image, mut picker } = self;
 
-        //// TODO: commented code would work using the same versions of `image` crate.
-        //// These extra steps are necessary until ratatui_image uses images 0.25.
+        // // TODO: commented code would work instead using the same versions of `image` crate.
+        // // These extra steps are necessary until ratatui_image uses `image` 0.25.
         //
         // let image = match self.rendered_image.clone().try_into_dynamic() {
         //     Ok(image) => image,
