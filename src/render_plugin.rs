@@ -1,17 +1,18 @@
+use std::io;
+
 use bevy::{
     prelude::*,
     render::{camera::RenderTarget, render_graph::RenderGraph, Render, RenderApp, RenderSet},
     utils::error,
 };
-use image::DynamicImage;
 
 use crate::{
     render_headless::{
-        image_copy_extract, receive_image_from_buffer, ImageCopy, ImageCopyNode, MainWorldReceiver,
-        RenderWorldSender,
+        image_copy_source_extract_system, initialize_ratatui_render_context_system,
+        receive_rendered_image_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
+        MainWorldReceiver, RenderWorldSender,
     },
-    render_systems::{rat_create, rat_print, rat_receive},
-    RatRenderWidget,
+    RatContext, RatRenderWidget,
 };
 
 /// basic setup:
@@ -48,8 +49,8 @@ impl Plugin for RatRenderPlugin {
 
         app.insert_resource(MainWorldReceiver(r))
             .insert_resource(RatRenderConfig::new(self.width, self.height))
-            .add_systems(PreStartup, rat_create)
-            .add_systems(First, rat_receive);
+            .add_systems(PreStartup, initialize_ratatui_render_context_system)
+            .add_systems(First, receive_rendered_image_system);
 
         let render_app = app.sub_app_mut(RenderApp);
 
@@ -59,11 +60,11 @@ impl Plugin for RatRenderPlugin {
 
         render_app
             .insert_resource(RenderWorldSender(s))
-            .add_systems(ExtractSchedule, image_copy_extract)
-            .add_systems(Render, receive_image_from_buffer.after(RenderSet::Render));
+            .add_systems(ExtractSchedule, image_copy_source_extract_system)
+            .add_systems(Render, send_rendered_image_system.after(RenderSet::Render));
 
         if self.print_full_terminal {
-            app.add_systems(Update, rat_print.map(error));
+            app.add_systems(Update, print_full_terminal_system.map(error));
         }
     }
 }
@@ -98,7 +99,7 @@ impl RatRenderConfig {
 #[derive(Resource, Default)]
 pub struct RatRenderContext {
     pub camera_target: RenderTarget,
-    pub rendered_image: Option<DynamicImage>,
+    pub rendered_image: Image,
 }
 
 impl RatRenderContext {
@@ -109,4 +110,15 @@ impl RatRenderContext {
     pub fn widget(&self) -> RatRenderWidget {
         RatRenderWidget::new(&self.rendered_image)
     }
+}
+
+pub fn print_full_terminal_system(
+    mut rat: ResMut<RatContext>,
+    rat_render_context: Res<RatRenderContext>,
+) -> io::Result<()> {
+    rat.draw(|frame| {
+        frame.render_widget(rat_render_context.widget(), frame.size());
+    })?;
+
+    Ok(())
 }

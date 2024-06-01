@@ -9,6 +9,7 @@ use std::sync::{
 use bevy::{
     prelude::*,
     render::{
+        camera::RenderTarget,
         render_asset::{RenderAssetUsages, RenderAssets},
         render_graph::{Node, NodeRunError, RenderGraphContext, RenderLabel},
         render_resource::{
@@ -22,7 +23,8 @@ use bevy::{
     },
 };
 use crossbeam_channel::{Receiver, Sender};
-use image::{DynamicImage, ImageBuffer};
+
+use crate::{render_plugin::RatRenderConfig, RatRenderContext};
 
 /// This will receive asynchronously any data sent from the render world
 #[derive(Resource, Deref)]
@@ -32,28 +34,24 @@ pub struct MainWorldReceiver(pub Receiver<Vec<u8>>);
 #[derive(Resource, Deref)]
 pub struct RenderWorldSender(pub Sender<Vec<u8>>);
 
-/// CPU-side image for saving
-#[derive(Component, Deref, DerefMut)]
-pub struct ImageToSave(pub Handle<Image>);
-
 /// `ImageCopier` aggregator in `RenderWorld`
 #[derive(Clone, Default, Resource, Deref, DerefMut)]
-pub struct ImageCopiers(pub Vec<ImageCopier>);
+pub struct ImageCopySources(pub Vec<ImageCopySource>);
 
 /// Used by `ImageCopyDriver` for copying from render target to buffer
 #[derive(Clone, Component)]
-pub struct ImageCopier {
+pub struct ImageCopySource {
     buffer: Buffer,
     enabled: Arc<AtomicBool>,
     src_image: Handle<Image>,
 }
 
-impl ImageCopier {
+impl ImageCopySource {
     pub fn new(
         src_image: Handle<Image>,
         size: Extent3d,
         render_device: &RenderDevice,
-    ) -> ImageCopier {
+    ) -> ImageCopySource {
         let padded_bytes_per_row =
             RenderDevice::align_copy_bytes_per_row((size.width) as usize) * 4;
 
@@ -64,7 +62,7 @@ impl ImageCopier {
             mapped_at_creation: false,
         });
 
-        ImageCopier {
+        ImageCopySource {
             buffer: cpu_buffer,
             src_image,
             enabled: Arc::new(AtomicBool::new(true)),
@@ -91,17 +89,17 @@ impl Node for ImageCopyNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let image_copiers = world.get_resource::<ImageCopiers>().unwrap();
+        let image_copy_sources = world.get_resource::<ImageCopySources>().unwrap();
         let gpu_images = world
             .get_resource::<RenderAssets<bevy::render::texture::GpuImage>>()
             .unwrap();
 
-        for image_copier in image_copiers.iter() {
-            if !image_copier.enabled() {
+        for image_copy_source in image_copy_sources.iter() {
+            if !image_copy_source.enabled() {
                 continue;
             }
 
-            let src_image = gpu_images.get(&image_copier.src_image).unwrap();
+            let src_image = gpu_images.get(&image_copy_source.src_image).unwrap();
 
             let mut encoder = render_context
                 .render_device()
@@ -127,7 +125,7 @@ impl Node for ImageCopyNode {
             encoder.copy_texture_to_buffer(
                 src_image.texture.as_image_copy(),
                 ImageCopyBuffer {
-                    buffer: &image_copier.buffer,
+                    buffer: &image_copy_source.buffer,
                     layout: ImageDataLayout {
                         offset: 0,
                         bytes_per_row: Some(
@@ -150,20 +148,26 @@ impl Node for ImageCopyNode {
 }
 
 /// Extracting `ImageCopier`s into render world, because `ImageCopyDriver` accesses them
-pub fn image_copy_extract(mut commands: Commands, image_copiers: Extract<Query<&ImageCopier>>) {
-    commands.insert_resource(ImageCopiers(
-        image_copiers.iter().cloned().collect::<Vec<ImageCopier>>(),
+pub fn image_copy_source_extract_system(
+    mut commands: Commands,
+    image_copy_sources: Extract<Query<&ImageCopySource>>,
+) {
+    commands.insert_resource(ImageCopySources(
+        image_copy_sources
+            .iter()
+            .cloned()
+            .collect::<Vec<ImageCopySource>>(),
     ));
 }
 
 /// runs in render world after Render stage to send image from buffer via channel (receiver is in main world)
-pub fn receive_image_from_buffer(
-    image_copiers: Res<ImageCopiers>,
+pub fn send_rendered_image_system(
+    image_copy_sources: Res<ImageCopySources>,
     render_device: Res<RenderDevice>,
     sender: Res<RenderWorldSender>,
 ) {
-    for image_copier in image_copiers.0.iter() {
-        if !image_copier.enabled() {
+    for image_copy_source in image_copy_sources.0.iter() {
+        if !image_copy_source.enabled() {
             continue;
         }
 
@@ -171,7 +175,7 @@ pub fn receive_image_from_buffer(
         // First we get a buffer slice which represents a chunk of the buffer (which we
         // can't access yet).
         // We want the whole thing so use unbounded range.
-        let buffer_slice = image_copier.buffer.slice(..);
+        let buffer_slice = image_copy_source.buffer.slice(..);
 
         // Now things get complicated. WebGPU, for safety reasons, only allows either the GPU
         // or CPU to access a buffer's contents at a time. We need to "map" the buffer which means
@@ -221,11 +225,22 @@ pub fn receive_image_from_buffer(
         // We need to make sure all `BufferView`'s are dropped before we do what we're about
         // to do.
         // Unmap so that we can copy to the staging buffer in the next iteration.
-        image_copier.buffer.unmap();
+        image_copy_source.buffer.unmap();
     }
 }
 
-pub fn create_render_textures(size: Extent3d) -> (Image, Image) {
+pub fn initialize_ratatui_render_context_system(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    rat_render_config: ResMut<RatRenderConfig>,
+    render_device: Res<RenderDevice>,
+) {
+    let size = Extent3d {
+        width: rat_render_config.width,
+        height: rat_render_config.height,
+        ..Default::default()
+    };
+
     // This is the texture that will be rendered to.
     let mut render_texture = Image::new_fill(
         size,
@@ -245,44 +260,48 @@ pub fn create_render_textures(size: Extent3d) -> (Image, Image) {
         TextureFormat::bevy_default(),
         RenderAssetUsages::default(),
     );
+    let render_handle = images.add(render_texture);
 
-    (render_texture, cpu_texture)
+    commands.spawn(ImageCopySource::new(
+        render_handle.clone(),
+        size,
+        &render_device,
+    ));
+
+    commands.insert_resource(RatRenderContext {
+        camera_target: RenderTarget::Image(render_handle),
+        rendered_image: cpu_texture,
+    });
 }
 
 // Takes from channel image content sent from render world and saves it to disk
-pub fn parse_image_data(
-    images: &mut ResMut<Assets<Image>>,
-    image_to_save: &ImageToSave,
-    image_data: Vec<u8>,
-) -> DynamicImage {
-    // Fill correct data from channel to image
-    let img_bytes = images.get_mut(image_to_save.id()).unwrap();
-
-    // We need to ensure that this works regardless of the image dimensions
-    // If the image became wider when copying from the texture to the buffer,
-    // then the data is reduced to its original size when copying from the buffer to the image.
-    let row_bytes = img_bytes.width() as usize * img_bytes.texture_descriptor.format.pixel_size();
-    let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
-    if row_bytes == aligned_row_bytes {
-        img_bytes.data.clone_from(&image_data);
-    } else {
-        // shrink data to original image size
-        img_bytes.data = image_data
-            .chunks(aligned_row_bytes)
-            .take(img_bytes.height() as usize)
-            .flat_map(|row| &row[..row_bytes.min(row.len())])
-            .cloned()
-            .collect();
+pub fn receive_rendered_image_system(
+    receiver: Res<MainWorldReceiver>,
+    mut rat_render_context: ResMut<RatRenderContext>,
+) {
+    let mut image_data = Vec::new();
+    while let Ok(data) = receiver.try_recv() {
+        image_data = data;
     }
+    if !image_data.is_empty() {
+        let RatRenderContext {
+            ref mut rendered_image,
+            ..
+        } = *rat_render_context;
 
-    // Create RGBA Image Buffer
-    let img = match img_bytes.clone().try_into_dynamic() {
-        Ok(img) => img,
-        Err(e) => panic!("Failed to create image buffer {e:?}"),
-    };
-
-    let img = img.to_rgb8();
-    let (width, height) = img.dimensions();
-
-    DynamicImage::ImageRgb8(ImageBuffer::from_raw(width, height, img.into_raw()).expect("failed"))
+        let row_bytes =
+            rendered_image.width() as usize * rendered_image.texture_descriptor.format.pixel_size();
+        let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
+        if row_bytes == aligned_row_bytes {
+            rendered_image.data.clone_from(&image_data);
+        } else {
+            // shrink data to original image size
+            rendered_image.data = image_data
+                .chunks(aligned_row_bytes)
+                .take(rendered_image.height() as usize)
+                .flat_map(|row| &row[..row_bytes.min(row.len())])
+                .cloned()
+                .collect();
+        }
+    }
 }

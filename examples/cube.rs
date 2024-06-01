@@ -107,22 +107,21 @@ fn rat_print(
         let inner = block.inner(frame.size());
 
         if flags.debug {
+            block = block
+                .title_top(format!(
+                    "[kitty protocol: {}]",
+                    if kitty_enabled { "enabled" } else { "disabled" }
+                ))
+                .title_alignment(Alignment::Right);
+
             if let Some(value) = diagnostics
                 .get(&FrameTimeDiagnosticsPlugin::FPS)
                 .and_then(|fps| fps.smoothed())
             {
                 block = block
-                    .title_top(format!("{value:.0}"))
+                    .title_top(format!("[fps: {value:.0}]"))
                     .title_alignment(Alignment::Right);
             }
-
-            block = block
-                .title_top(if kitty_enabled {
-                    "kitty enabled"
-                } else {
-                    "kitty disabled"
-                })
-                .title_alignment(Alignment::Right);
         }
 
         frame.render_widget(block, frame.size());

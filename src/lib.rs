@@ -2,7 +2,6 @@ mod rat_plugin;
 mod rat_tui;
 mod render_headless;
 mod render_plugin;
-mod render_systems;
 mod render_widget;
 
 pub use rat_plugin::{RatContext, RatEvent, RatPlugin};
