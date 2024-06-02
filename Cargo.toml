@@ -1,10 +1,15 @@
 [package]
 name = "bevy_ratatui_render"
+description = "A bevy plugin for rendering your bevy app to the terminal using ratatui."
 version = "0.1.0"
-authors = ["cxreiff <cooper@cxreiff.com>"]
-description = "bevy plugin for setting up ratatui in a headless bevy system."
-license = "MIT"
 edition = "2021"
+authors = ["cxreiff <cooper@cxreiff.com>"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/cxreiff/bevy_ratatui_render"
+documentation = "https://docs.rs/bevy_ratatui_render"
+categories = ["game-engines", "gui", "rendering", "command-line-interface"]
+keywords = ["bevy", "ratatui", "terminal", "tui", "render"]
 
 [dependencies]
 bevy = { git = "https://github.com/bevyengine/bevy" }
@@ -12,3 +17,9 @@ crossterm = "0.27.0"
 crossbeam-channel = "0.5.12"
 ratatui = "0.26.3"
 ratatui-image = "1.0.1"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

@@ -43,14 +43,14 @@ fn main() {
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
         .insert_resource(ClearColor(Color::srgb_u8(0, 0, 0)))
-        .add_systems(Startup, scene_setup)
-        .add_systems(Update, rat_print.map(error))
+        .add_systems(Startup, setup_scene)
+        .add_systems(Update, draw_scene.map(error))
         .add_systems(Update, handle_keys.map(error))
         .add_systems(Update, rotate_cube.after(handle_keys))
         .run();
 }
 
-fn scene_setup(
+fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -93,7 +93,7 @@ fn scene_setup(
     });
 }
 
-fn rat_print(
+fn draw_scene(
     mut rat: ResMut<RatatuiContext>,
     rat_render: Res<RatatuiRenderContext>,
     flags: Res<Flags>,
