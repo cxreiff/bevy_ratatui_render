@@ -24,19 +24,19 @@ use crate::{
 ///
 /// basic setup:
 ///
-/// ```
+/// ```rust
 /// app.add_plugins((
 ///     RatatuiPlugin,
 ///     RatatuiRenderPlugin::new(512, 512).print_full_terminal(),
 /// ))
-/// .add_systems(Startup, setup_camera)
+/// .add_systems(Startup, setup_scene)
 ///
 /// ...
 ///
-/// fn setup_camera(mut commands: Commands, rat_render: Res<RatatuiRenderContext>) {
+/// fn setup_scene(mut commands: Commands, ratatui_render: Res<RatatuiRenderContext>) {
 ///     commands.spawn(Camera3dBundle {
 ///         camera: Camera {
-///             target: rat_render.target(),
+///             target: ratatui_render.target(),
 ///             ..default()
 ///         },
 ///         ..default()

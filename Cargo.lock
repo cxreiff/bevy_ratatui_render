@@ -744,7 +744,6 @@ dependencies = [
  "bevy",
  "crossbeam-channel",
  "crossterm",
- "image",
  "ratatui",
  "ratatui-image",
 ]

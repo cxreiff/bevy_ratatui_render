@@ -6,9 +6,9 @@ Uses bevy headless rendering, [ratatui](https://github.com/ratatui-org/ratatui),
 [ratatui_image](https://github.com/benjajaja/ratatui-image) to print the rendered output
 of your bevy application to the terminal using unicode halfblocks.
 
-![cube example](repo/cube.gif)![foxes](repo/foxes.gif)![sponza test scene](repo/sponza.gif)
+![cube example](https://assets.cxreiff.com/github/cube.gif)![foxes](https://assets.cxreiff.com/github/foxes.gif)![sponza test scene](https://assets.cxreiff.com/github/sponza.gif)
 
-> examples/cube.rs, bevy manyfoxes example, sponza test scene
+> examples/cube.rs, bevy many_foxes example, sponza test scene
 
 ## getting started
 
@@ -94,5 +94,7 @@ creating multiple render targets.
 
 ## credits
 
-* Headless rendering code adapted from bevy's headless_render example (@bugsweeper, @alice-i-cecile, @mockersf).
-
+* Headless rendering code adapted from bevy's [headless_render](https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs)
+example (@bugsweeper, @alice-i-cecile, @mockersf).
+* bevy's [many_foxes](https://github.com/bevyengine/bevy/blob/main/examples/stress_tests/many_foxes.rs) example used for example gif.
+* [bevy_sponza_scene](https://github.com/DGriffin91/bevy_sponza_scene) used for example gif.
