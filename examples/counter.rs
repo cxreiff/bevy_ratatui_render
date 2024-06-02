@@ -4,7 +4,7 @@ use bevy::{
     prelude::*,
     time::common_conditions::on_timer,
 };
-use bevy_rat::{RatContext, RatEvent, RatPlugin};
+use bevy_ratatui_render::{RatatuiContext, RatatuiEvent, RatatuiPlugin};
 use crossterm::event;
 use ratatui::{prelude::Stylize, widgets::Paragraph};
 use std::io::Result;
@@ -17,7 +17,7 @@ fn main() {
                 1.0 / 15.0,
             ))),
         )
-        .add_plugins(RatPlugin)
+        .add_plugins(RatatuiPlugin)
         .add_systems(Startup, count_setup)
         .add_systems(
             Update,
@@ -28,7 +28,7 @@ fn main() {
         .run();
 }
 
-fn rat_print(mut rat: ResMut<RatContext>, count: Res<Count>) -> Result<()> {
+fn rat_print(mut rat: ResMut<RatatuiContext>, count: Res<Count>) -> Result<()> {
     rat.draw(|frame| {
         let message = format!("count: {} ('q' to quit)", count.count);
         let area = frame.size();
@@ -38,13 +38,16 @@ fn rat_print(mut rat: ResMut<RatContext>, count: Res<Count>) -> Result<()> {
     Ok(())
 }
 
-fn q_to_quit(mut exit: EventWriter<AppExit>, mut rat_events: EventReader<RatEvent>) -> Result<()> {
+fn q_to_quit(
+    mut exit: EventWriter<AppExit>,
+    mut rat_events: EventReader<RatatuiEvent>,
+) -> Result<()> {
     for ev in rat_events.read() {
-        if let RatEvent(event::Event::Key(key_event)) = ev {
+        if let RatatuiEvent(event::Event::Key(key_event)) = ev {
             if key_event.kind == event::KeyEventKind::Press
                 && key_event.code == event::KeyCode::Char('q')
             {
-                exit.send(AppExit::Success);
+                exit.send_default();
             }
         }
     }

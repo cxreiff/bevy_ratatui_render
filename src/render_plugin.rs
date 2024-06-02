@@ -7,12 +7,13 @@ use bevy::{
 };
 
 use crate::{
+    rat_plugin::RatatuiContext,
     render_headless::{
         image_copy_source_extract_system, initialize_ratatui_render_context_system_generator,
         receive_rendered_image_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
         MainWorldReceiver, RenderWorldSender,
     },
-    RatContext, RatRenderWidget,
+    render_widget::RatatuiRenderWidget,
 };
 
 /// Sets up headless rendering and makes the `RatRenderContext` resource available
@@ -25,14 +26,14 @@ use crate::{
 ///
 /// ```
 /// app.add_plugins((
-///     RatPlugin,
-///     RatRenderPlugin::new(512, 512).print_full_terminal(),
+///     RatatuiPlugin,
+///     RatatuiRenderPlugin::new(512, 512).print_full_terminal(),
 /// ))
 /// .add_systems(Startup, setup_camera)
 ///
 /// ...
 ///
-/// fn setup_camera(mut commands: Commands, rat_render: Res<RatRenderContext>) {
+/// fn setup_camera(mut commands: Commands, rat_render: Res<RatatuiRenderContext>) {
 ///     commands.spawn(Camera3dBundle {
 ///         camera: Camera {
 ///             target: rat_render.target(),
@@ -43,13 +44,13 @@ use crate::{
 /// }
 /// ```
 #[derive(Default)]
-pub struct RatRenderPlugin {
+pub struct RatatuiRenderPlugin {
     width: u32,
     height: u32,
     print_full_terminal: bool,
 }
 
-impl RatRenderPlugin {
+impl RatatuiRenderPlugin {
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             width,
@@ -64,7 +65,7 @@ impl RatRenderPlugin {
     }
 }
 
-impl Plugin for RatRenderPlugin {
+impl Plugin for RatatuiRenderPlugin {
     fn build(&self, app: &mut App) {
         let (s, r) = crossbeam_channel::unbounded();
 
@@ -100,24 +101,24 @@ impl Plugin for RatRenderPlugin {
 /// `widget()` to generate a ratatui widget that will draw whatever was rendered to the render
 /// target in the ratatui frame.
 #[derive(Resource, Default)]
-pub struct RatRenderContext {
+pub struct RatatuiRenderContext {
     pub camera_target: RenderTarget,
     pub rendered_image: Image,
 }
 
-impl RatRenderContext {
+impl RatatuiRenderContext {
     pub fn target(&self) -> RenderTarget {
         self.camera_target.clone()
     }
 
-    pub fn widget(&self) -> RatRenderWidget {
-        RatRenderWidget::new(&self.rendered_image)
+    pub fn widget(&self) -> RatatuiRenderWidget {
+        RatatuiRenderWidget::new(&self.rendered_image)
     }
 }
 
 fn print_full_terminal_system(
-    mut rat: ResMut<RatContext>,
-    rat_render_context: Res<RatRenderContext>,
+    mut rat: ResMut<RatatuiContext>,
+    rat_render_context: Res<RatatuiRenderContext>,
 ) -> io::Result<()> {
     rat.draw(|frame| {
         frame.render_widget(rat_render_context.widget(), frame.size());

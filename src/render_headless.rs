@@ -1,4 +1,4 @@
-// ADAPTED FROM BEVY `headless_renderer.rs` EXAMPLE BY @bugsweeper
+// FROM @bugsweeper's BEVY HEADLESS RENDERING EXAMPLE
 // (https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs)
 
 use std::sync::{
@@ -24,7 +24,7 @@ use bevy::{
 };
 use crossbeam_channel::{Receiver, Sender};
 
-use crate::RatRenderContext;
+use crate::render_plugin::RatatuiRenderContext;
 
 /// Receives data asynchronously from the render world
 #[derive(Resource, Deref)]
@@ -200,7 +200,7 @@ pub fn initialize_ratatui_render_context_system_generator(
             &render_device,
         ));
 
-        commands.insert_resource(RatRenderContext {
+        commands.insert_resource(RatatuiRenderContext {
             camera_target: RenderTarget::Image(render_handle),
             rendered_image: cpu_texture,
         });
@@ -279,14 +279,14 @@ pub fn send_rendered_image_system(
 // Receives image in main world from render world and updates RatRenderContext
 pub fn receive_rendered_image_system(
     receiver: Res<MainWorldReceiver>,
-    mut rat_render_context: ResMut<RatRenderContext>,
+    mut rat_render_context: ResMut<RatatuiRenderContext>,
 ) {
     let mut image_data = Vec::new();
     while let Ok(data) = receiver.try_recv() {
         image_data = data;
     }
     if !image_data.is_empty() {
-        let RatRenderContext {
+        let RatatuiRenderContext {
             ref mut rendered_image,
             ..
         } = *rat_render_context;

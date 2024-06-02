@@ -8,9 +8,9 @@ use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::utils::error;
 use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
-use bevy_rat::RatEvent;
-use bevy_rat::{RatContext, RatPlugin};
-use bevy_rat::{RatRenderContext, RatRenderPlugin};
+use bevy_ratatui_render::{
+    RatatuiContext, RatatuiEvent, RatatuiPlugin, RatatuiRenderContext, RatatuiRenderPlugin,
+};
 use crossterm::event;
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
@@ -37,8 +37,8 @@ fn main() {
                 }),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 60.0)),
             FrameTimeDiagnosticsPlugin,
-            RatPlugin,
-            RatRenderPlugin::new(256, 256),
+            RatatuiPlugin,
+            RatatuiRenderPlugin::new(256, 256),
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
@@ -54,7 +54,7 @@ fn scene_setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    rat_render: Res<RatRenderContext>,
+    rat_render: Res<RatatuiRenderContext>,
 ) {
     commands.spawn((
         Cube,
@@ -94,8 +94,8 @@ fn scene_setup(
 }
 
 fn rat_print(
-    mut rat: ResMut<RatContext>,
-    rat_render: Res<RatRenderContext>,
+    mut rat: ResMut<RatatuiContext>,
+    rat_render: Res<RatatuiRenderContext>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
@@ -140,13 +140,13 @@ pub enum InputState {
 }
 
 pub fn handle_keys(
-    mut rat_events: EventReader<RatEvent>,
+    mut rat_events: EventReader<RatatuiEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
     mut input: ResMut<InputState>,
 ) -> io::Result<()> {
     for ev in rat_events.read() {
-        if let RatEvent(event::Event::Key(key_event)) = ev {
+        if let RatatuiEvent(event::Event::Key(key_event)) = ev {
             match key_event.kind {
                 event::KeyEventKind::Press | event::KeyEventKind::Repeat => match key_event.code {
                     event::KeyCode::Char('q') => {

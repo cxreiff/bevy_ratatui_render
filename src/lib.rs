@@ -4,6 +4,6 @@ mod render_headless;
 mod render_plugin;
 mod render_widget;
 
-pub use rat_plugin::{RatContext, RatEvent, RatPlugin};
-pub use render_plugin::{RatRenderContext, RatRenderPlugin};
-pub use render_widget::RatRenderWidget;
+pub use rat_plugin::{RatatuiContext, RatatuiEvent, RatatuiPlugin};
+pub use render_plugin::{RatatuiRenderContext, RatatuiRenderPlugin};
+pub use render_widget::RatatuiRenderWidget;
