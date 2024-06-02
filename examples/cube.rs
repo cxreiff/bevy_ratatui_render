@@ -2,7 +2,6 @@ use std::io;
 use std::time::Duration;
 
 use bevy::app::AppExit;
-use bevy::color::Color;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::utils::error;
@@ -42,7 +41,7 @@ fn main() {
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
-        .insert_resource(ClearColor(Color::srgb_u8(0, 0, 0)))
+        .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, draw_scene.map(error))
         .add_systems(Update, handle_keys.map(error))
@@ -61,7 +60,7 @@ fn setup_scene(
         PbrBundle {
             mesh: meshes.add(Cuboid::default()),
             material: materials.add(StandardMaterial {
-                base_color: bevy::prelude::Color::srgb_u8(100, 140, 180),
+                base_color: bevy::prelude::Color::rgb(100. / 256., 140. / 256., 180. / 256.),
                 ..Default::default()
             }),
             transform: Transform::default(),
@@ -69,7 +68,7 @@ fn setup_scene(
         },
     ));
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Plane3d::new(Vec3::new(0., 0., 1.), Vec2::new(8., 8.))),
+        mesh: meshes.add(Cuboid::new(15., 15., 1.)),
         material: materials.add(StandardMaterial::default()),
         transform: Transform::from_xyz(0., 0., -6.),
         ..Default::default()
@@ -150,7 +149,7 @@ pub fn handle_keys(
             match key_event.kind {
                 event::KeyEventKind::Press | event::KeyEventKind::Repeat => match key_event.code {
                     event::KeyCode::Char('q') => {
-                        exit.send(AppExit::Success);
+                        exit.send(AppExit);
                     }
 
                     event::KeyCode::Char('d') => {

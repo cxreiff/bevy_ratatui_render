@@ -78,7 +78,7 @@ impl Plugin for RatatuiRenderPlugin {
 
         let render_app = app.sub_app_mut(RenderApp);
 
-        let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
+        let mut graph = render_app.world.resource_mut::<RenderGraph>();
         graph.add_node(ImageCopy, ImageCopyNode);
         graph.add_node_edge(bevy::render::graph::CameraDriverLabel, ImageCopy);
 

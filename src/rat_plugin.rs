@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use bevy::{prelude::*, utils::error};
+use bevy::{app::AppExit, prelude::*, utils::error};
 use crossterm::event::{self, KeyCode, KeyModifiers};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
