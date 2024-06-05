@@ -11,7 +11,7 @@ use bevy_ratatui_render::{
     RatatuiContext, RatatuiEvent, RatatuiPlugin, RatatuiRenderContext, RatatuiRenderPlugin,
 };
 use crossterm::event;
-use ratatui::layout::Alignment;
+use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::widgets::Block;
@@ -37,7 +37,10 @@ fn main() {
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugin,
-            RatatuiRenderPlugin::new().add_render((256, 256)),
+            RatatuiRenderPlugin::new()
+                .add_render((128, 128))
+                .add_render((128, 128))
+                .add_render((256, 128)),
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
@@ -67,12 +70,6 @@ fn setup_scene_system(
             ..Default::default()
         },
     ));
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(15., 15., 1.)),
-        material: materials.add(StandardMaterial::default()),
-        transform: Transform::from_xyz(0., 0., -6.),
-        ..Default::default()
-    });
     commands.spawn(PointLightBundle {
         point_light: PointLight {
             shadows_enabled: true,
@@ -82,10 +79,28 @@ fn setup_scene_system(
         ..default()
     });
     commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
+        transform: Transform::from_xyz(0., 3., 0.).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
             target: rat_render.target(0),
+            ..default()
+        },
+        ..default()
+    });
+    commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(0., 0., 3.).looking_at(Vec3::ZERO, Vec3::Z),
+        tonemapping: Tonemapping::None,
+        camera: Camera {
+            target: rat_render.target(1),
+            ..default()
+        },
+        ..default()
+    });
+    commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Z),
+        tonemapping: Tonemapping::None,
+        camera: Camera {
+            target: rat_render.target(2),
             ..default()
         },
         ..default()
@@ -100,10 +115,26 @@ fn draw_scene_system(
 ) -> io::Result<()> {
     let kitty_enabled = rat.kitty_enabled;
     rat.draw(|frame| {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(frame.size());
+
+        let top_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(layout[0]);
+
         let mut block = Block::bordered()
             .bg(ratatui::style::Color::Rgb(0, 0, 0))
             .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)));
-        let inner = block.inner(frame.size());
+
+        let inner_top_left = block.inner(top_layout[0]);
+        let inner_top_right = block.inner(top_layout[1]);
+        let inner_bottom = block.inner(layout[1]);
+
+        frame.render_widget(block.clone(), top_layout[0]);
+        frame.render_widget(block.clone(), layout[1]);
 
         if flags.debug {
             block = block
@@ -123,8 +154,10 @@ fn draw_scene_system(
             }
         }
 
-        frame.render_widget(block, frame.size());
-        frame.render_widget(rat_render.widget(0), inner);
+        frame.render_widget(block, top_layout[1]);
+        frame.render_widget(rat_render.widget(0), inner_top_left);
+        frame.render_widget(rat_render.widget(1), inner_top_right);
+        frame.render_widget(rat_render.widget(2), inner_bottom);
     })?;
 
     Ok(())
