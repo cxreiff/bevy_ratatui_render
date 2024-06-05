@@ -18,14 +18,14 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             RatatuiPlugin,
-            RatatuiRenderPlugin::new(256, 256),
+            RatatuiRenderPlugin::new().add_render((256, 256)),
         ))
-        .add_systems(Startup, setup_scene)
-        .add_systems(Update, draw_scene.map(error))
+        .add_systems(Startup, setup_scene_system)
+        .add_systems(Update, draw_scene_system.map(error))
         .run();
 }
 
-fn setup_scene(
+fn setup_scene_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -37,19 +37,19 @@ fn setup_scene(
 
     commands.spawn(Camera3dBundle {
         camera: Camera {
-            target: ratatui_render.target(),
+            target: ratatui_render.target(0),
             ..default()
         },
         ..default()
     });
 }
 
-fn draw_scene(
+fn draw_scene_system(
     mut ratatui: ResMut<RatatuiContext>,
     ratatui_render: Res<RatatuiRenderContext>,
 ) -> io::Result<()> {
     ratatui.draw(|frame| {
-        frame.render_widget(ratatui_render.widget(), frame.size());
+        frame.render_widget(ratatui_render.widget(0), frame.size());
     })?;
 
     Ok(())
@@ -60,7 +60,7 @@ There is a convenience function if you do not need access to the ratatui draw lo
 the render to print to the full terminal (use instead of adding the `draw_scene` system above):
 
 ```rust
-RatatuiRenderPlugin::new(256, 256).print_full_terminal()
+RatatuiRenderPlugin::new().add_render((256, 256)).print_full_terminal(0)
 ```
 
 I also recommend telling bevy you don't need a window or anti-aliasing:
@@ -75,6 +75,13 @@ DefaultPlugins
     })
 ```
 
+## multiple renders
+
+When you call `add_render((width, height))` a new render target and destination will be created,
+associated with an index that increments from zero. For multiple renders, just call `add_render` multiple
+times, and then use the index for the order it was created in the `target(index)`, `widget(index)`, and
+`print_full_terminal(index)` methods (I may implement string IDs in the future, but for now using an index kept the code simple).
+
 ## supported terminals
 
 This relies on the terminal supporting 24-bit color. I've personality tested and confirmed that the following terminals display color correctly:
@@ -82,6 +89,7 @@ This relies on the terminal supporting 24-bit color. I've personality tested and
 - Alacritty
 - Kitty
 - iTerm
+- WezTerm
 
 ## what's next?
 

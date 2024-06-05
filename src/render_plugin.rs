@@ -10,8 +10,8 @@ use crate::{
     rat_plugin::RatatuiContext,
     render_headless::{
         image_copy_source_extract_system, initialize_ratatui_render_context_system_generator,
-        receive_rendered_image_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
-        MainWorldReceiver, RenderWorldSender,
+        receive_rendered_images_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
+        RatatuiRenderPipe,
     },
     render_widget::RatatuiRenderWidget,
 };
@@ -19,15 +19,23 @@ use crate::{
 /// Sets up headless rendering and makes the `RatRenderContext` resource available
 /// to use in your camera and ratatui draw loop.
 ///
-/// Use `print_full_terminal()` to add a minimal ratatui draw loop that just draws
-/// your bevy scene to the full terminal window.
+/// Use `add_render((width, height))` for each render you would like to set up, and a render target
+/// and destination image will be created each time, associated with an index (starting at zero).
 ///
-/// basic setup:
+/// Use the renders' indices in the `target(index)` function for a `RenderTarget` that can be
+/// placed in a bevy camera.
 ///
+/// Use the index in the `widget(index)` function for a Ratatui widget that will display the output
+/// of the render in the terminal.
+///
+/// Use `print_full_terminal(index)` to add a minimal ratatui draw loop that just draws the render
+/// at the given index to the full terminal window.
+///
+/// example:
 /// ```rust
 /// app.add_plugins((
 ///     RatatuiPlugin,
-///     RatatuiRenderPlugin::new(512, 512).print_full_terminal(),
+///     RatatuiRenderPlugin::new().add_render((256, 256)).print_full_terminal(0),
 /// ))
 /// .add_systems(Startup, setup_scene)
 ///
@@ -36,7 +44,7 @@ use crate::{
 /// fn setup_scene(mut commands: Commands, ratatui_render: Res<RatatuiRenderContext>) {
 ///     commands.spawn(Camera3dBundle {
 ///         camera: Camera {
-///             target: ratatui_render.target(),
+///             target: ratatui_render.target(0),
 ///             ..default()
 ///         },
 ///         ..default()
@@ -45,36 +53,33 @@ use crate::{
 /// ```
 #[derive(Default)]
 pub struct RatatuiRenderPlugin {
-    width: u32,
-    height: u32,
-    print_full_terminal: bool,
+    render_configs: Vec<(u32, u32)>,
+    print_full_terminal: Option<usize>,
 }
 
 impl RatatuiRenderPlugin {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            width,
-            height,
-            ..default()
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn print_full_terminal(mut self) -> Self {
-        self.print_full_terminal = true;
+    pub fn add_render(mut self, dimensions: (u32, u32)) -> Self {
+        self.render_configs.push(dimensions);
+        self
+    }
+
+    pub fn print_full_terminal(mut self, index: usize) -> Self {
+        self.print_full_terminal = Some(index);
         self
     }
 }
 
 impl Plugin for RatatuiRenderPlugin {
     fn build(&self, app: &mut App) {
-        let (s, r) = crossbeam_channel::unbounded();
-
-        app.insert_resource(MainWorldReceiver(r))
-            .add_systems(
-                PreStartup,
-                initialize_ratatui_render_context_system_generator(self.width, self.height),
-            )
-            .add_systems(First, receive_rendered_image_system);
+        app.add_systems(
+            PreStartup,
+            initialize_ratatui_render_context_system_generator(self.render_configs.clone()),
+        )
+        .add_systems(First, receive_rendered_images_system);
 
         let render_app = app.sub_app_mut(RenderApp);
 
@@ -83,12 +88,11 @@ impl Plugin for RatatuiRenderPlugin {
         graph.add_node_edge(bevy::render::graph::CameraDriverLabel, ImageCopy);
 
         render_app
-            .insert_resource(RenderWorldSender(s))
             .add_systems(ExtractSchedule, image_copy_source_extract_system)
             .add_systems(Render, send_rendered_image_system.after(RenderSet::Render));
 
-        if self.print_full_terminal {
-            app.add_systems(Update, print_full_terminal_system.map(error));
+        if let Some(index) = self.print_full_terminal {
+            app.add_systems(Update, print_full_terminal_system(index).map(error));
         }
     }
 }
@@ -102,27 +106,27 @@ impl Plugin for RatatuiRenderPlugin {
 /// target in the ratatui frame.
 #[derive(Resource, Default)]
 pub struct RatatuiRenderContext {
-    pub camera_target: RenderTarget,
-    pub rendered_image: Image,
+    pub render_pipes: Vec<RatatuiRenderPipe>,
 }
 
 impl RatatuiRenderContext {
-    pub fn target(&self) -> RenderTarget {
-        self.camera_target.clone()
+    pub fn target(&self, index: usize) -> RenderTarget {
+        self.render_pipes[index].target.clone()
     }
 
-    pub fn widget(&self) -> RatatuiRenderWidget {
-        RatatuiRenderWidget::new(&self.rendered_image)
+    pub fn widget(&self, index: usize) -> RatatuiRenderWidget {
+        RatatuiRenderWidget::new(&self.render_pipes[index].image)
     }
 }
 
 fn print_full_terminal_system(
-    mut rat: ResMut<RatatuiContext>,
-    rat_render_context: Res<RatatuiRenderContext>,
-) -> io::Result<()> {
-    rat.draw(|frame| {
-        frame.render_widget(rat_render_context.widget(), frame.size());
-    })?;
+    index: usize,
+) -> impl FnMut(ResMut<RatatuiContext>, Res<RatatuiRenderContext>) -> io::Result<()> {
+    move |mut ratatui, ratatui_render| {
+        ratatui.draw(|frame| {
+            frame.render_widget(ratatui_render.widget(index), frame.size());
+        })?;
 
-    Ok(())
+        Ok(())
+    }
 }

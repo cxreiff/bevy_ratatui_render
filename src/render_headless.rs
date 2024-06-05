@@ -26,14 +26,6 @@ use crossbeam_channel::{Receiver, Sender};
 
 use crate::render_plugin::RatatuiRenderContext;
 
-/// Receives data asynchronously from the render world
-#[derive(Resource, Deref)]
-pub struct MainWorldReceiver(pub Receiver<Vec<u8>>);
-
-/// Sends data asynchronously to the main world
-#[derive(Resource, Deref)]
-pub struct RenderWorldSender(pub Sender<Vec<u8>>);
-
 /// `ImageCopySource` aggregator in `RenderWorld`
 #[derive(Clone, Default, Resource, Deref, DerefMut)]
 pub struct ImageCopySources(pub Vec<ImageCopySource>);
@@ -44,6 +36,7 @@ pub struct ImageCopySource {
     buffer: Buffer,
     enabled: Arc<AtomicBool>,
     src_image: Handle<Image>,
+    sender: Sender<Vec<u8>>,
 }
 
 impl ImageCopySource {
@@ -51,6 +44,7 @@ impl ImageCopySource {
         src_image: Handle<Image>,
         size: Extent3d,
         render_device: &RenderDevice,
+        sender: Sender<Vec<u8>>,
     ) -> ImageCopySource {
         let padded_bytes_per_row =
             RenderDevice::align_copy_bytes_per_row((size.width) as usize) * 4;
@@ -66,11 +60,87 @@ impl ImageCopySource {
             buffer: cpu_buffer,
             src_image,
             enabled: Arc::new(AtomicBool::new(true)),
+            sender,
         }
     }
 
     pub fn enabled(&self) -> bool {
         self.enabled.load(Ordering::Relaxed)
+    }
+}
+
+pub struct RatatuiRenderPipe {
+    receiver: Receiver<Vec<u8>>,
+    pub target: RenderTarget,
+    pub image: Image,
+}
+
+impl RatatuiRenderPipe {
+    fn new(
+        commands: &mut Commands,
+        images: &mut ResMut<Assets<Image>>,
+        render_device: &Res<RenderDevice>,
+        (width, height): (u32, u32),
+    ) -> Self {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+
+        let size = Extent3d {
+            width,
+            height,
+            ..Default::default()
+        };
+
+        // This is the texture that will be rendered to.
+        let mut render_texture = Image::new_fill(
+            size,
+            TextureDimension::D2,
+            &[0; 4],
+            TextureFormat::bevy_default(),
+            RenderAssetUsages::default(),
+        );
+        render_texture.texture_descriptor.usage |= TextureUsages::COPY_SRC
+            | TextureUsages::RENDER_ATTACHMENT
+            | TextureUsages::TEXTURE_BINDING;
+
+        let render_handle = images.add(render_texture);
+
+        // This is the texture that will be copied to.
+        let cpu_texture = Image::new_fill(
+            size,
+            TextureDimension::D2,
+            &[0; 4],
+            TextureFormat::bevy_default(),
+            RenderAssetUsages::default(),
+        );
+
+        commands.spawn(ImageCopySource::new(
+            render_handle.clone(),
+            size,
+            render_device,
+            sender,
+        ));
+
+        Self {
+            target: RenderTarget::Image(render_handle),
+            image: cpu_texture,
+            receiver,
+        }
+    }
+}
+
+/// Creates textures and initializes RatRenderContext
+pub fn initialize_ratatui_render_context_system_generator(
+    configs: Vec<(u32, u32)>,
+) -> impl FnMut(Commands, ResMut<Assets<Image>>, Res<RenderDevice>) {
+    move |mut commands, mut images, render_device| {
+        let render_pipes = configs
+            .iter()
+            .map(|dimensions| {
+                RatatuiRenderPipe::new(&mut commands, &mut images, &render_device, *dimensions)
+            })
+            .collect();
+
+        commands.insert_resource(RatatuiRenderContext { render_pipes });
     }
 }
 
@@ -158,60 +228,12 @@ pub fn image_copy_source_extract_system(
     ));
 }
 
-/// Creates textures and initializes RatRenderContext
-pub fn initialize_ratatui_render_context_system_generator(
-    width: u32,
-    height: u32,
-) -> impl FnMut(Commands, ResMut<Assets<Image>>, Res<RenderDevice>) {
-    move |mut commands, mut images, render_device| {
-        let size = Extent3d {
-            width,
-            height,
-            ..Default::default()
-        };
-
-        // This is the texture that will be rendered to.
-        let mut render_texture = Image::new_fill(
-            size,
-            TextureDimension::D2,
-            &[0; 4],
-            TextureFormat::bevy_default(),
-            RenderAssetUsages::default(),
-        );
-        render_texture.texture_descriptor.usage |= TextureUsages::COPY_SRC
-            | TextureUsages::RENDER_ATTACHMENT
-            | TextureUsages::TEXTURE_BINDING;
-
-        // This is the texture that will be copied to.
-        let cpu_texture = Image::new_fill(
-            size,
-            TextureDimension::D2,
-            &[0; 4],
-            TextureFormat::bevy_default(),
-            RenderAssetUsages::default(),
-        );
-        let render_handle = images.add(render_texture);
-
-        commands.spawn(ImageCopySource::new(
-            render_handle.clone(),
-            size,
-            &render_device,
-        ));
-
-        commands.insert_resource(RatatuiRenderContext {
-            camera_target: RenderTarget::Image(render_handle),
-            rendered_image: cpu_texture,
-        });
-    }
-}
-
 /// Sends image from buffer in render world to main world via channel
 pub fn send_rendered_image_system(
     image_copy_sources: Res<ImageCopySources>,
     render_device: Res<RenderDevice>,
-    sender: Res<RenderWorldSender>,
 ) {
-    for image_copy_source in image_copy_sources.0.iter() {
+    for image_copy_source in image_copy_sources.iter() {
         if !image_copy_source.enabled() {
             continue;
         }
@@ -265,7 +287,9 @@ pub fn send_rendered_image_system(
         r.recv().expect("Failed to receive the map_async message");
 
         // This could fail on app exit, if Main world clears resources (including receiver) while Render world still renders
-        let _ = sender.send(buffer_slice.get_mapped_range().to_vec());
+        let _ = image_copy_source
+            .sender
+            .send(buffer_slice.get_mapped_range().to_vec());
 
         // We need to make sure all `BufferView`'s are dropped before we do what we're about
         // to do.
@@ -275,33 +299,27 @@ pub fn send_rendered_image_system(
 }
 
 // Receives image in main world from render world and updates RatRenderContext
-pub fn receive_rendered_image_system(
-    receiver: Res<MainWorldReceiver>,
-    mut rat_render_context: ResMut<RatatuiRenderContext>,
-) {
-    let mut image_data = Vec::new();
-    while let Ok(data) = receiver.try_recv() {
-        image_data = data;
-    }
-    if !image_data.is_empty() {
-        let RatatuiRenderContext {
-            ref mut rendered_image,
-            ..
-        } = *rat_render_context;
-
-        let row_bytes =
-            rendered_image.width() as usize * rendered_image.texture_descriptor.format.pixel_size();
-        let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
-        if row_bytes == aligned_row_bytes {
-            rendered_image.data.clone_from(&image_data);
-        } else {
-            // shrink data to original image size
-            rendered_image.data = image_data
-                .chunks(aligned_row_bytes)
-                .take(rendered_image.height() as usize)
-                .flat_map(|row| &row[..row_bytes.min(row.len())])
-                .cloned()
-                .collect();
+pub fn receive_rendered_images_system(mut ratatui_render: ResMut<RatatuiRenderContext>) {
+    for render_pipe in &mut ratatui_render.render_pipes {
+        let mut image_data = Vec::new();
+        while let Ok(data) = render_pipe.receiver.try_recv() {
+            image_data = data;
+        }
+        if !image_data.is_empty() {
+            let row_bytes = render_pipe.image.width() as usize
+                * render_pipe.image.texture_descriptor.format.pixel_size();
+            let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
+            if row_bytes == aligned_row_bytes {
+                render_pipe.image.data.clone_from(&image_data);
+            } else {
+                // shrink data to original image size
+                render_pipe.image.data = image_data
+                    .chunks(aligned_row_bytes)
+                    .take(render_pipe.image.height() as usize)
+                    .flat_map(|row| &row[..row_bytes.min(row.len())])
+                    .cloned()
+                    .collect();
+            }
         }
     }
 }

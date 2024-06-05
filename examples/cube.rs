@@ -37,19 +37,19 @@ fn main() {
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / 60.0)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugin,
-            RatatuiRenderPlugin::new(256, 256),
+            RatatuiRenderPlugin::new().add_render((256, 256)),
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
-        .add_systems(Startup, setup_scene)
-        .add_systems(Update, draw_scene.map(error))
-        .add_systems(Update, handle_keys.map(error))
-        .add_systems(Update, rotate_cube.after(handle_keys))
+        .add_systems(Startup, setup_scene_system)
+        .add_systems(Update, draw_scene_system.map(error))
+        .add_systems(Update, handle_input_system.map(error))
+        .add_systems(Update, rotate_cube_system.after(handle_input_system))
         .run();
 }
 
-fn setup_scene(
+fn setup_scene_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -85,14 +85,14 @@ fn setup_scene(
         transform: Transform::from_xyz(3., 3., 3.0).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target: rat_render.target(),
+            target: rat_render.target(0),
             ..default()
         },
         ..default()
     });
 }
 
-fn draw_scene(
+fn draw_scene_system(
     mut rat: ResMut<RatatuiContext>,
     rat_render: Res<RatatuiRenderContext>,
     flags: Res<Flags>,
@@ -124,7 +124,7 @@ fn draw_scene(
         }
 
         frame.render_widget(block, frame.size());
-        frame.render_widget(rat_render.widget(), inner);
+        frame.render_widget(rat_render.widget(0), inner);
     })?;
 
     Ok(())
@@ -138,7 +138,7 @@ pub enum InputState {
     Right(f32),
 }
 
-pub fn handle_keys(
+pub fn handle_input_system(
     mut rat_events: EventReader<RatatuiEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
@@ -186,7 +186,7 @@ pub fn handle_keys(
     Ok(())
 }
 
-fn rotate_cube(
+fn rotate_cube_system(
     time: Res<Time>,
     mut cube: Query<&mut Transform, With<Cube>>,
     mut input: ResMut<InputState>,
