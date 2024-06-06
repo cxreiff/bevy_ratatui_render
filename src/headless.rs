@@ -1,5 +1,7 @@
-// FROM @bugsweeper's BEVY HEADLESS RENDERING EXAMPLE
-// (https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs)
+// For more detailed comments on this general approach, please reference @bugsweeper's
+// excellent headless_rendering bevy example:
+//
+// https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -24,13 +26,11 @@ use bevy::{
 };
 use crossbeam_channel::{Receiver, Sender};
 
-use crate::render_plugin::RatatuiRenderContext;
+use crate::RatatuiRenderContext;
 
-/// `ImageCopySource` aggregator in `RenderWorld`
 #[derive(Clone, Default, Resource, Deref, DerefMut)]
 pub struct ImageCopySources(pub Vec<ImageCopySource>);
 
-/// Used by `ImageCopy` for copying from render target to buffer
 #[derive(Clone, Component)]
 pub struct ImageCopySource {
     buffer: Buffer,
@@ -90,7 +90,6 @@ impl RatatuiRenderPipe {
             ..Default::default()
         };
 
-        // This is the texture that will be rendered to.
         let mut render_texture = Image::new_fill(
             size,
             TextureDimension::D2,
@@ -104,7 +103,6 @@ impl RatatuiRenderPipe {
 
         let render_handle = images.add(render_texture);
 
-        // This is the texture that will be copied to.
         let cpu_texture = Image::new_fill(
             size,
             TextureDimension::D2,
@@ -128,7 +126,6 @@ impl RatatuiRenderPipe {
     }
 }
 
-/// Creates textures and initializes RatRenderContext
 pub fn initialize_ratatui_render_context_system_generator(
     configs: Vec<(u32, u32)>,
 ) -> impl FnMut(Commands, ResMut<Assets<Image>>, Res<RenderDevice>) {
@@ -144,11 +141,9 @@ pub fn initialize_ratatui_render_context_system_generator(
     }
 }
 
-/// `RenderGraph` label for `ImageCopy`
 #[derive(Debug, PartialEq, Eq, Clone, Hash, RenderLabel)]
 pub struct ImageCopy;
 
-/// `RenderGraph` node
 #[derive(Default)]
 pub struct ImageCopyNode;
 
@@ -176,10 +171,6 @@ impl Node for ImageCopyNode {
             let block_dimensions = src_image.texture_format.block_dimensions();
             let block_size = src_image.texture_format.block_copy_size(None).unwrap();
 
-            // Calculating correct size of image row because
-            // copy_texture_to_buffer can copy image only by rows aligned wgpu::COPY_BYTES_PER_ROW_ALIGNMENT
-            // That's why image in buffer can be little bit wider
-            // This should be taken into account at copy from buffer stage
             let padded_bytes_per_row = RenderDevice::align_copy_bytes_per_row(
                 (src_image.size.x as usize / block_dimensions.0 as usize) * block_size as usize,
             );
@@ -215,7 +206,6 @@ impl Node for ImageCopyNode {
     }
 }
 
-/// Extracts `ImageCopySource`s into render world, because `ImageCopy` accesses them
 pub fn image_copy_source_extract_system(
     mut commands: Commands,
     image_copy_sources: Extract<Query<&ImageCopySource>>,
@@ -228,7 +218,6 @@ pub fn image_copy_source_extract_system(
     ));
 }
 
-/// Sends image from buffer in render world to main world via channel
 pub fn send_rendered_image_system(
     image_copy_sources: Res<ImageCopySources>,
     render_device: Res<RenderDevice>,
@@ -238,67 +227,27 @@ pub fn send_rendered_image_system(
             continue;
         }
 
-        // Finally time to get our data back from the gpu.
-        // First we get a buffer slice which represents a chunk of the buffer (which we
-        // can't access yet).
-        // We want the whole thing so use unbounded range.
         let buffer_slice = image_copy_source.buffer.slice(..);
-
-        // Now things get complicated. WebGPU, for safety reasons, only allows either the GPU
-        // or CPU to access a buffer's contents at a time. We need to "map" the buffer which means
-        // flipping ownership of the buffer over to the CPU and making access legal. We do this
-        // with `BufferSlice::map_async`.
-        //
-        // The problem is that map_async is not an async function so we can't await it. What
-        // we need to do instead is pass in a closure that will be executed when the slice is
-        // either mapped or the mapping has failed.
-        //
-        // The problem with this is that we don't have a reliable way to wait in the main
-        // code for the buffer to be mapped and even worse, calling get_mapped_range or
-        // get_mapped_range_mut prematurely will cause a panic, not return an error.
-        //
-        // Using channels solves this as awaiting the receiving of a message from
-        // the passed closure will force the outside code to wait. It also doesn't hurt
-        // if the closure finishes before the outside code catches up as the message is
-        // buffered and receiving will just pick that up.
-        //
-        // It may also be worth noting that although on native, the usage of asynchronous
-        // channels is wholly unnecessary, for the sake of portability to WASM
-        // we'll use async channels that work on both native and WASM.
 
         let (s, r) = crossbeam_channel::bounded(1);
 
-        // Maps the buffer so it can be read on the cpu
         buffer_slice.map_async(MapMode::Read, move |r| match r {
-            // This will execute once the gpu is ready, so after the call to poll()
             Ok(r) => s.send(r).expect("Failed to send map update"),
             Err(err) => panic!("Failed to map buffer {err}"),
         });
 
-        // In order for the mapping to be completed, one of three things must happen.
-        // One of those can be calling `Device::poll`. This isn't necessary on the web as devices
-        // are polled automatically but natively, we need to make sure this happens manually.
-        // `Maintain::Wait` will cause the thread to wait on native but not on WebGpu.
-
-        // This blocks until the gpu is done executing everything
         render_device.poll(Maintain::wait()).panic_on_timeout();
 
-        // This blocks until the buffer is mapped
         r.recv().expect("Failed to receive the map_async message");
 
-        // This could fail on app exit, if Main world clears resources (including receiver) while Render world still renders
         let _ = image_copy_source
             .sender
             .send(buffer_slice.get_mapped_range().to_vec());
 
-        // We need to make sure all `BufferView`'s are dropped before we do what we're about
-        // to do.
-        // Unmap so that we can copy to the staging buffer in the next iteration.
         image_copy_source.buffer.unmap();
     }
 }
 
-// Receives image in main world from render world and updates RatRenderContext
 pub fn receive_rendered_images_system(mut ratatui_render: ResMut<RatatuiRenderContext>) {
     for render_pipe in &mut ratatui_render.render_pipes {
         let mut image_data = Vec::new();
@@ -312,7 +261,6 @@ pub fn receive_rendered_images_system(mut ratatui_render: ResMut<RatatuiRenderCo
             if row_bytes == aligned_row_bytes {
                 render_pipe.image.data.clone_from(&image_data);
             } else {
-                // shrink data to original image size
                 render_pipe.image.data = image_data
                     .chunks(aligned_row_bytes)
                     .take(render_pipe.image.height() as usize)

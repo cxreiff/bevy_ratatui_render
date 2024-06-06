@@ -10,11 +10,11 @@ use bevy::{app::ScheduleRunnerPlugin, prelude::*};
 use bevy_ratatui_render::{
     RatatuiContext, RatatuiEvent, RatatuiPlugin, RatatuiRenderContext, RatatuiRenderPlugin,
 };
-use crossterm::event;
+use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::style::Style;
 use ratatui::style::Stylize;
-use ratatui::widgets::Block;
+use ratatui::widgets::{Block, Padding};
 
 #[derive(Component)]
 pub struct Cube;
@@ -47,7 +47,7 @@ fn main() {
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, draw_scene_system.map(error))
-        .add_systems(Update, handle_input_system.map(error))
+        .add_systems(Update, handle_input_system)
         .add_systems(Update, rotate_cube_system.after(handle_input_system))
         .run();
 }
@@ -108,56 +108,70 @@ fn setup_scene_system(
 }
 
 fn draw_scene_system(
-    mut rat: ResMut<RatatuiContext>,
-    rat_render: Res<RatatuiRenderContext>,
+    mut ratatui: ResMut<RatatuiContext>,
+    ratatui_render: Res<RatatuiRenderContext>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
-    let kitty_enabled = rat.kitty_enabled;
-    rat.draw(|frame| {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(frame.size());
-
-        let top_layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(layout[0]);
-
+    let kitty_enabled = ratatui.kitty_enabled;
+    ratatui.draw(|frame| {
         let mut block = Block::bordered()
             .bg(ratatui::style::Color::Rgb(0, 0, 0))
             .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)));
 
-        let inner_top_left = block.inner(top_layout[0]);
-        let inner_top_right = block.inner(top_layout[1]);
-        let inner_bottom = block.inner(layout[1]);
+        let bottom_block = block.clone();
+        let top_left_block = block.clone();
+        let top_right_block = block.clone();
 
-        frame.render_widget(block.clone(), top_layout[0]);
-        frame.render_widget(block.clone(), layout[1]);
+        block = block
+            .padding(Padding::proportional(1))
+            .title_bottom("[q for quit]")
+            .title_bottom("[d for debug]")
+            .title_alignment(Alignment::Center);
 
         if flags.debug {
-            block = block
-                .title_top(format!(
-                    "[kitty protocol: {}]",
-                    if kitty_enabled { "enabled" } else { "disabled" }
-                ))
-                .title_alignment(Alignment::Right);
+            block = block.title_top(format!(
+                "[kitty protocol: {}]",
+                if kitty_enabled { "enabled" } else { "disabled" }
+            ));
 
             if let Some(value) = diagnostics
                 .get(&FrameTimeDiagnosticsPlugin::FPS)
                 .and_then(|fps| fps.smoothed())
             {
-                block = block
-                    .title_top(format!("[fps: {value:.0}]"))
-                    .title_alignment(Alignment::Right);
+                block = block.title_top(format!("[fps: {value:.0}]"));
             }
         }
 
-        frame.render_widget(block, top_layout[1]);
-        frame.render_widget(rat_render.widget(0), inner_top_left);
-        frame.render_widget(rat_render.widget(1), inner_top_right);
-        frame.render_widget(rat_render.widget(2), inner_bottom);
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(block.inner(frame.size()));
+
+        let top_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![
+                Constraint::Percentage(50),
+                Constraint::Length(1),
+                Constraint::Percentage(50),
+            ])
+            .split(layout[0]);
+
+        let top_left = top_layout[0];
+        let top_right = top_layout[2];
+        let bottom = layout[1];
+
+        let inner_top_left = top_left_block.inner(top_left);
+        let inner_top_right = top_right_block.inner(top_right);
+        let inner_bottom = bottom_block.inner(bottom);
+
+        frame.render_widget(block, frame.size());
+        frame.render_widget(top_left_block, top_left);
+        frame.render_widget(bottom_block, top_right);
+        frame.render_widget(top_right_block, bottom);
+        frame.render_widget(ratatui_render.widget(0), inner_top_left);
+        frame.render_widget(ratatui_render.widget(1), inner_top_right);
+        frame.render_widget(ratatui_render.widget(2), inner_bottom);
     })?;
 
     Ok(())
@@ -172,40 +186,40 @@ pub enum InputState {
 }
 
 pub fn handle_input_system(
-    mut rat_events: EventReader<RatatuiEvent>,
+    mut ratatui_events: EventReader<RatatuiEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
     mut input: ResMut<InputState>,
-) -> io::Result<()> {
-    for ev in rat_events.read() {
-        if let RatatuiEvent(event::Event::Key(key_event)) = ev {
+) {
+    for RatatuiEvent(event) in ratatui_events.read() {
+        if let Event::Key(key_event) = event {
             match key_event.kind {
-                event::KeyEventKind::Press | event::KeyEventKind::Repeat => match key_event.code {
-                    event::KeyCode::Char('q') => {
+                KeyEventKind::Press | KeyEventKind::Repeat => match key_event.code {
+                    KeyCode::Char('q') => {
                         exit.send(AppExit);
                     }
 
-                    event::KeyCode::Char('d') => {
+                    KeyCode::Char('d') => {
                         flags.debug = !flags.debug;
                     }
 
-                    event::KeyCode::Left => {
+                    KeyCode::Left => {
                         *input = InputState::Left(0.75);
                     }
 
-                    event::KeyCode::Right => {
+                    KeyCode::Right => {
                         *input = InputState::Right(0.75);
                     }
 
                     _ => {}
                 },
-                event::KeyEventKind::Release => match key_event.code {
-                    event::KeyCode::Left => {
+                KeyEventKind::Release => match key_event.code {
+                    KeyCode::Left => {
                         if let InputState::Left(_) = *input {
                             *input = InputState::None;
                         }
                     }
-                    event::KeyCode::Right => {
+                    KeyCode::Right => {
                         if let InputState::Right(_) = *input {
                             *input = InputState::None;
                         }
@@ -215,8 +229,6 @@ pub fn handle_input_system(
             }
         }
     }
-
-    Ok(())
 }
 
 fn rotate_cube_system(

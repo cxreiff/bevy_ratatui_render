@@ -10,7 +10,7 @@ use bevy::{app::ScheduleRunnerPlugin, prelude::*};
 use bevy_ratatui_render::{
     RatatuiContext, RatatuiEvent, RatatuiPlugin, RatatuiRenderContext, RatatuiRenderPlugin,
 };
-use crossterm::event;
+use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
@@ -44,7 +44,7 @@ fn main() {
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, draw_scene_system.map(error))
-        .add_systems(Update, handle_input_system.map(error))
+        .add_systems(Update, handle_input_system)
         .add_systems(Update, rotate_cube_system.after(handle_input_system))
         .run();
 }
@@ -93,33 +93,34 @@ fn setup_scene_system(
 }
 
 fn draw_scene_system(
-    mut rat: ResMut<RatatuiContext>,
+    mut ratatui: ResMut<RatatuiContext>,
     rat_render: Res<RatatuiRenderContext>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
-    let kitty_enabled = rat.kitty_enabled;
-    rat.draw(|frame| {
+    let kitty_enabled = ratatui.kitty_enabled;
+    ratatui.draw(|frame| {
         let mut block = Block::bordered()
             .bg(ratatui::style::Color::Rgb(0, 0, 0))
-            .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)));
+            .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)))
+            .title_bottom("[q for quit]")
+            .title_bottom("[d for debug]")
+            .title_bottom("[p for panic]")
+            .title_alignment(Alignment::Center);
+
         let inner = block.inner(frame.size());
 
         if flags.debug {
-            block = block
-                .title_top(format!(
-                    "[kitty protocol: {}]",
-                    if kitty_enabled { "enabled" } else { "disabled" }
-                ))
-                .title_alignment(Alignment::Right);
+            block = block.title_top(format!(
+                "[kitty protocol: {}]",
+                if kitty_enabled { "enabled" } else { "disabled" }
+            ));
 
             if let Some(value) = diagnostics
                 .get(&FrameTimeDiagnosticsPlugin::FPS)
                 .and_then(|fps| fps.smoothed())
             {
-                block = block
-                    .title_top(format!("[fps: {value:.0}]"))
-                    .title_alignment(Alignment::Right);
+                block = block.title_top(format!("[fps: {value:.0}]"));
             }
         }
 
@@ -143,36 +144,40 @@ pub fn handle_input_system(
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
     mut input: ResMut<InputState>,
-) -> io::Result<()> {
-    for ev in rat_events.read() {
-        if let RatatuiEvent(event::Event::Key(key_event)) = ev {
+) {
+    for RatatuiEvent(event) in rat_events.read() {
+        if let Event::Key(key_event) = event {
             match key_event.kind {
-                event::KeyEventKind::Press | event::KeyEventKind::Repeat => match key_event.code {
-                    event::KeyCode::Char('q') => {
+                KeyEventKind::Press | KeyEventKind::Repeat => match key_event.code {
+                    KeyCode::Char('q') => {
                         exit.send(AppExit);
                     }
 
-                    event::KeyCode::Char('d') => {
+                    KeyCode::Char('p') => {
+                        panic!("Panic!");
+                    }
+
+                    KeyCode::Char('d') => {
                         flags.debug = !flags.debug;
                     }
 
-                    event::KeyCode::Left => {
+                    KeyCode::Left => {
                         *input = InputState::Left(0.75);
                     }
 
-                    event::KeyCode::Right => {
+                    KeyCode::Right => {
                         *input = InputState::Right(0.75);
                     }
 
                     _ => {}
                 },
-                event::KeyEventKind::Release => match key_event.code {
-                    event::KeyCode::Left => {
+                KeyEventKind::Release => match key_event.code {
+                    KeyCode::Left => {
                         if let InputState::Left(_) = *input {
                             *input = InputState::None;
                         }
                     }
-                    event::KeyCode::Right => {
+                    KeyCode::Right => {
                         if let InputState::Right(_) = *input {
                             *input = InputState::None;
                         }
@@ -182,8 +187,6 @@ pub fn handle_input_system(
             }
         }
     }
-
-    Ok(())
 }
 
 fn rotate_cube_system(

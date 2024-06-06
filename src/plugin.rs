@@ -7,13 +7,12 @@ use bevy::{
 };
 
 use crate::{
-    rat_plugin::RatatuiContext,
-    render_headless::{
+    headless::{
         image_copy_source_extract_system, initialize_ratatui_render_context_system_generator,
         receive_rendered_images_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
         RatatuiRenderPipe,
     },
-    render_widget::RatatuiRenderWidget,
+    RatatuiContext, RatatuiRenderWidget,
 };
 
 /// Sets up headless rendering and makes the `RatRenderContext` resource available
