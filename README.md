@@ -12,12 +12,14 @@ of your bevy application to the terminal using unicode halfblocks.
 
 ## getting started
 
+`cargo add bevy_ratatui_render bevy_ratatui`
+
 ```rust
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            RatatuiPlugin,
+            RatatuiPlugins::default(),
             RatatuiRenderPlugin::new().add_render((256, 256)),
         ))
         .add_systems(Startup, setup_scene_system)

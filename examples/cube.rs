@@ -7,10 +7,12 @@ use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::utils::error;
 use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
-use bevy_ratatui_render::{
-    RatatuiContext, RatatuiEvent, RatatuiPlugin, RatatuiRenderContext, RatatuiRenderPlugin,
-};
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use bevy_ratatui::event::KeyEvent;
+use bevy_ratatui::kitty::KittyEnabled;
+use bevy_ratatui::terminal::RatatuiContext;
+use bevy_ratatui::RatatuiPlugins;
+use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
+use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
@@ -36,7 +38,7 @@ fn main() {
                 }),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
-            RatatuiPlugin,
+            RatatuiPlugins::default(),
             RatatuiRenderPlugin::new().add_render((256, 256)),
         ))
         .insert_resource(Flags::default())
@@ -53,7 +55,7 @@ fn setup_scene_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    rat_render: Res<RatatuiRenderContext>,
+    ratatui_render: Res<RatatuiRenderContext>,
 ) {
     commands.spawn((
         Cube,
@@ -85,7 +87,7 @@ fn setup_scene_system(
         transform: Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target: rat_render.target(0),
+            target: ratatui_render.target(0),
             ..default()
         },
         ..default()
@@ -97,8 +99,8 @@ fn draw_scene_system(
     rat_render: Res<RatatuiRenderContext>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
+    kitty_enabled: Option<Res<KittyEnabled>>,
 ) -> io::Result<()> {
-    let kitty_enabled = ratatui.kitty_enabled;
     ratatui.draw(|frame| {
         let mut block = Block::bordered()
             .bg(ratatui::style::Color::Rgb(0, 0, 0))
@@ -113,7 +115,11 @@ fn draw_scene_system(
         if flags.debug {
             block = block.title_top(format!(
                 "[kitty protocol: {}]",
-                if kitty_enabled { "enabled" } else { "disabled" }
+                if kitty_enabled.is_some() {
+                    "enabled"
+                } else {
+                    "disabled"
+                }
             ));
 
             if let Some(value) = diagnostics
@@ -140,51 +146,49 @@ pub enum InputState {
 }
 
 pub fn handle_input_system(
-    mut rat_events: EventReader<RatatuiEvent>,
+    mut rat_events: EventReader<KeyEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
     mut input: ResMut<InputState>,
 ) {
-    for RatatuiEvent(event) in rat_events.read() {
-        if let Event::Key(key_event) = event {
-            match key_event.kind {
-                KeyEventKind::Press | KeyEventKind::Repeat => match key_event.code {
-                    KeyCode::Char('q') => {
-                        exit.send(AppExit);
-                    }
+    for KeyEvent(key_event) in rat_events.read() {
+        match key_event.kind {
+            KeyEventKind::Press | KeyEventKind::Repeat => match key_event.code {
+                KeyCode::Char('q') => {
+                    exit.send(AppExit);
+                }
 
-                    KeyCode::Char('p') => {
-                        panic!("Panic!");
-                    }
+                KeyCode::Char('p') => {
+                    panic!("Panic!");
+                }
 
-                    KeyCode::Char('d') => {
-                        flags.debug = !flags.debug;
-                    }
+                KeyCode::Char('d') => {
+                    flags.debug = !flags.debug;
+                }
 
-                    KeyCode::Left => {
-                        *input = InputState::Left(0.75);
-                    }
+                KeyCode::Left => {
+                    *input = InputState::Left(0.75);
+                }
 
-                    KeyCode::Right => {
-                        *input = InputState::Right(0.75);
-                    }
+                KeyCode::Right => {
+                    *input = InputState::Right(0.75);
+                }
 
-                    _ => {}
-                },
-                KeyEventKind::Release => match key_event.code {
-                    KeyCode::Left => {
-                        if let InputState::Left(_) = *input {
-                            *input = InputState::None;
-                        }
+                _ => {}
+            },
+            KeyEventKind::Release => match key_event.code {
+                KeyCode::Left => {
+                    if let InputState::Left(_) = *input {
+                        *input = InputState::None;
                     }
-                    KeyCode::Right => {
-                        if let InputState::Right(_) = *input {
-                            *input = InputState::None;
-                        }
+                }
+                KeyCode::Right => {
+                    if let InputState::Right(_) = *input {
+                        *input = InputState::None;
                     }
-                    _ => {}
-                },
-            }
+                }
+                _ => {}
+            },
         }
     }
 }

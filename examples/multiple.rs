@@ -7,10 +7,12 @@ use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::utils::error;
 use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
-use bevy_ratatui_render::{
-    RatatuiContext, RatatuiEvent, RatatuiPlugin, RatatuiRenderContext, RatatuiRenderPlugin,
-};
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use bevy_ratatui::event::KeyEvent;
+use bevy_ratatui::kitty::KittyEnabled;
+use bevy_ratatui::terminal::RatatuiContext;
+use bevy_ratatui::RatatuiPlugins;
+use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
+use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::style::Style;
 use ratatui::style::Stylize;
@@ -36,7 +38,7 @@ fn main() {
                 }),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
-            RatatuiPlugin,
+            RatatuiPlugins::default(),
             RatatuiRenderPlugin::new()
                 .add_render((128, 128))
                 .add_render((128, 128))
@@ -112,8 +114,8 @@ fn draw_scene_system(
     ratatui_render: Res<RatatuiRenderContext>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
+    kitty_enabled: Option<Res<KittyEnabled>>,
 ) -> io::Result<()> {
-    let kitty_enabled = ratatui.kitty_enabled;
     ratatui.draw(|frame| {
         let mut block = Block::bordered()
             .bg(ratatui::style::Color::Rgb(0, 0, 0))
@@ -132,7 +134,11 @@ fn draw_scene_system(
         if flags.debug {
             block = block.title_top(format!(
                 "[kitty protocol: {}]",
-                if kitty_enabled { "enabled" } else { "disabled" }
+                if kitty_enabled.is_some() {
+                    "enabled"
+                } else {
+                    "disabled"
+                }
             ));
 
             if let Some(value) = diagnostics
@@ -186,47 +192,45 @@ pub enum InputState {
 }
 
 pub fn handle_input_system(
-    mut ratatui_events: EventReader<RatatuiEvent>,
+    mut ratatui_events: EventReader<KeyEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
     mut input: ResMut<InputState>,
 ) {
-    for RatatuiEvent(event) in ratatui_events.read() {
-        if let Event::Key(key_event) = event {
-            match key_event.kind {
-                KeyEventKind::Press | KeyEventKind::Repeat => match key_event.code {
-                    KeyCode::Char('q') => {
-                        exit.send(AppExit);
-                    }
+    for KeyEvent(key_event) in ratatui_events.read() {
+        match key_event.kind {
+            KeyEventKind::Press | KeyEventKind::Repeat => match key_event.code {
+                KeyCode::Char('q') => {
+                    exit.send(AppExit);
+                }
 
-                    KeyCode::Char('d') => {
-                        flags.debug = !flags.debug;
-                    }
+                KeyCode::Char('d') => {
+                    flags.debug = !flags.debug;
+                }
 
-                    KeyCode::Left => {
-                        *input = InputState::Left(0.75);
-                    }
+                KeyCode::Left => {
+                    *input = InputState::Left(0.75);
+                }
 
-                    KeyCode::Right => {
-                        *input = InputState::Right(0.75);
-                    }
+                KeyCode::Right => {
+                    *input = InputState::Right(0.75);
+                }
 
-                    _ => {}
-                },
-                KeyEventKind::Release => match key_event.code {
-                    KeyCode::Left => {
-                        if let InputState::Left(_) = *input {
-                            *input = InputState::None;
-                        }
+                _ => {}
+            },
+            KeyEventKind::Release => match key_event.code {
+                KeyCode::Left => {
+                    if let InputState::Left(_) = *input {
+                        *input = InputState::None;
                     }
-                    KeyCode::Right => {
-                        if let InputState::Right(_) = *input {
-                            *input = InputState::None;
-                        }
+                }
+                KeyCode::Right => {
+                    if let InputState::Right(_) = *input {
+                        *input = InputState::None;
                     }
-                    _ => {}
-                },
-            }
+                }
+                _ => {}
+            },
         }
     }
 }

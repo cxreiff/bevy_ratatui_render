@@ -5,6 +5,7 @@ use bevy::{
     render::{camera::RenderTarget, render_graph::RenderGraph, Render, RenderApp, RenderSet},
     utils::error,
 };
+use bevy_ratatui::terminal::RatatuiContext;
 
 use crate::{
     headless::{
@@ -12,7 +13,7 @@ use crate::{
         receive_rendered_images_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
         RatatuiRenderPipe,
     },
-    RatatuiContext, RatatuiRenderWidget,
+    RatatuiRenderWidget,
 };
 
 /// Sets up headless rendering and makes the `RatRenderContext` resource available
@@ -33,7 +34,7 @@ use crate::{
 /// example:
 /// ```rust
 /// app.add_plugins((
-///     RatatuiPlugin,
+///     RatatuiPlugins::default(),
 ///     RatatuiRenderPlugin::new().add_render((256, 256)).print_full_terminal(0),
 /// ))
 /// .add_systems(Startup, setup_scene)
@@ -99,9 +100,9 @@ impl Plugin for RatatuiRenderPlugin {
 /// Resource containing a bevy camera render target and an image that will be updated each frame
 /// with the results of whatever is rendered to that target.
 ///
-/// `target()` to clone the render target.
+/// `target(index)` to clone the render target.
 ///
-/// `widget()` to generate a ratatui widget that will draw whatever was rendered to the render
+/// `widget(index)` to generate a ratatui widget that will draw whatever was rendered to the render
 /// target in the ratatui frame.
 #[derive(Resource, Default)]
 pub struct RatatuiRenderContext {
