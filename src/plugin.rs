@@ -31,15 +31,23 @@ use crate::{
 /// Use `print_full_terminal(index)` to add a minimal ratatui draw loop that just draws the render
 /// at the given index to the full terminal window.
 ///
-/// example:
+/// # example:
 /// ```rust
-/// app.add_plugins((
-///     RatatuiPlugins::default(),
-///     RatatuiRenderPlugin::new().add_render((256, 256)).print_full_terminal(0),
-/// ))
-/// .add_systems(Startup, setup_scene)
+/// # use bevy::prelude::*;
+/// # use bevy_ratatui::RatatuiPlugins;
+/// # use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
+/// #
+/// fn main() {
+///     App::new()
+///         .add_plugins((
+///             DefaultPlugins,
+///             RatatuiPlugins::default(),
+///             RatatuiRenderPlugin::new().add_render((256, 256)).print_full_terminal(0),
+///         ))
+///         .add_systems(Startup, setup_scene);
+/// }
 ///
-/// ...
+/// // ...
 ///
 /// fn setup_scene(mut commands: Commands, ratatui_render: Res<RatatuiRenderContext>) {
 ///     commands.spawn(Camera3dBundle {
