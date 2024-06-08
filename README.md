@@ -10,6 +10,9 @@ of your bevy application to the terminal using unicode halfblocks.
 
 > examples/cube.rs, bevy many_foxes example, sponza test scene
 
+Use [bevy_ratatui](https://github.com/joshka/bevy_ratatui/tree/main) for setting ratatui up
+and receiving terminal events (keyboard, focus, mouse, paste, resize) inside bevy.
+
 ## getting started
 
 `cargo add bevy_ratatui_render bevy_ratatui`
@@ -82,11 +85,13 @@ DefaultPlugins
 When you call `add_render((width, height))` a new render target and destination will be created,
 associated with an index that increments from zero. For multiple renders, just call `add_render` multiple
 times, and then use the index for the order it was created in the `target(index)`, `widget(index)`, and
-`print_full_terminal(index)` methods (I may implement string IDs in the future, but for now using an index kept the code simple).
+`print_full_terminal(index)` methods (I may implement string IDs in the future, but for now using an
+index kept the code simple).
 
 ## supported terminals
 
-This relies on the terminal supporting 24-bit color. I've personality tested and confirmed that the following terminals display color correctly:
+This relies on the terminal supporting 24-bit color. I've personality tested and confirmed that the
+following terminals display color correctly:
 
 - Alacritty
 - Kitty
@@ -95,16 +100,17 @@ This relies on the terminal supporting 24-bit color. I've personality tested and
 
 ## what's next?
 
-This package currently contains both the headless rendering functionality and a layer of integration between
-ratatui and bevy. I plan to scoop out the integration layer and contribute to the
-[bevy_ratatui](https://github.com/joshka/bevy_ratatui/tree/main) package instead.
+I am still refining the interface for creating render targets- I would like devs to be able to identify
+render targets with descriptive string IDs instead of integer indices.
 
-Additionally, this package is currently set up for a single camera. It shouldn't take much more code to allow
-creating multiple render targets.
+Also, it may be slightly nicer to create multiple render targets by instantiating the plugin multiple
+times, rather than the current builder pattern.
 
 ## credits
 
-* Headless rendering code adapted from bevy's [headless_render](https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs)
+* Headless rendering code adapted from bevy's
+[headless_render](https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs)
 example (@bugsweeper, @alice-i-cecile, @mockersf).
-* bevy's [many_foxes](https://github.com/bevyengine/bevy/blob/main/examples/stress_tests/many_foxes.rs) example used for example gif.
+* bevy's [many_foxes](https://github.com/bevyengine/bevy/blob/main/examples/stress_tests/many_foxes.rs)
+example used for example gif.
 * [bevy_sponza_scene](https://github.com/DGriffin91/bevy_sponza_scene) used for example gif.
