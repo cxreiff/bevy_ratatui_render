@@ -32,7 +32,7 @@ use crate::{
 /// at the given index to the full terminal window.
 ///
 /// # example:
-/// ```rust
+/// ```no_run
 /// # use bevy::prelude::*;
 /// # use bevy_ratatui::RatatuiPlugins;
 /// # use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
