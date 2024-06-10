@@ -39,7 +39,7 @@ fn main() {
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new().add_render((256, 256)),
+            RatatuiRenderPlugin::new("main", (256, 256)),
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
@@ -87,7 +87,7 @@ fn setup_scene_system(
         transform: Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target: ratatui_render.target(0),
+            target: ratatui_render.target("main").unwrap(),
             ..default()
         },
         ..default()
@@ -131,7 +131,7 @@ fn draw_scene_system(
         }
 
         frame.render_widget(block, frame.size());
-        frame.render_widget(rat_render.widget(0), inner);
+        frame.render_widget(rat_render.widget("main").unwrap(), inner);
     })?;
 
     Ok(())

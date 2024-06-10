@@ -2,34 +2,35 @@ use std::io;
 
 use bevy::{
     prelude::*,
-    render::{camera::RenderTarget, render_graph::RenderGraph, Render, RenderApp, RenderSet},
-    utils::error,
+    render::{
+        camera::RenderTarget, render_graph::RenderGraph, renderer::RenderDevice, Render, RenderApp,
+        RenderSet,
+    },
+    utils::{error, hashbrown::HashMap},
 };
 use bevy_ratatui::terminal::RatatuiContext;
 
 use crate::{
     headless::{
-        image_copy_source_extract_system, initialize_ratatui_render_context_system_generator,
-        receive_rendered_images_system, send_rendered_image_system, ImageCopy, ImageCopyNode,
-        RatatuiRenderPipe,
+        image_copier_extract_system, receive_rendered_images_system, send_rendered_image_system,
+        HeadlessRenderPipe, ImageCopy, ImageCopyNode,
     },
     RatatuiRenderWidget,
 };
 
-/// Sets up headless rendering and makes the `RatRenderContext` resource available
+/// Sets up headless rendering and makes the `RatatuiRenderContext` resource available
 /// to use in your camera and ratatui draw loop.
 ///
-/// Use `add_render((width, height))` for each render you would like to set up, and a render target
-/// and destination image will be created each time, associated with an index (starting at zero).
+/// Can be added multiple times to set up multiple render targets. Use
+/// `RatatuiRenderPlugin::new("id", (width, height))` for each render you would like to set up,
+/// and then pass your string id into the `RatatuiRenderContext` resource's `target(id)` and
+/// `widget(id)` methods for the render target and ratatui widget respectively.
 ///
-/// Use the renders' indices in the `target(index)` function for a `RenderTarget` that can be
-/// placed in a bevy camera.
+/// Place the render target in a bevy camera, and use the ratatui widget in a ratatui draw loop in
+/// order to display the bevy camera's render in the terminal.
 ///
-/// Use the index in the `widget(index)` function for a Ratatui widget that will display the output
-/// of the render in the terminal.
-///
-/// Use `print_full_terminal(index)` to add a minimal ratatui draw loop that just draws the render
-/// at the given index to the full terminal window.
+/// Use `print_full_terminal()` to add a minimal ratatui draw loop that just draws the render
+/// to the full terminal window.
 ///
 /// # example:
 /// ```no_run
@@ -42,7 +43,7 @@ use crate::{
 ///         .add_plugins((
 ///             DefaultPlugins,
 ///             RatatuiPlugins::default(),
-///             RatatuiRenderPlugin::new().add_render((256, 256)).print_full_terminal(0),
+///             RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal(),
 ///         ))
 ///         .add_systems(Startup, setup_scene);
 /// }
@@ -52,88 +53,118 @@ use crate::{
 /// fn setup_scene(mut commands: Commands, ratatui_render: Res<RatatuiRenderContext>) {
 ///     commands.spawn(Camera3dBundle {
 ///         camera: Camera {
-///             target: ratatui_render.target(0),
+///             target: ratatui_render.target("main").unwrap(),
 ///             ..default()
 ///         },
 ///         ..default()
 ///     });
 /// }
 /// ```
-#[derive(Default)]
 pub struct RatatuiRenderPlugin {
-    render_configs: Vec<(u32, u32)>,
-    print_full_terminal: Option<usize>,
+    label: String,
+    dimensions: (u32, u32),
+    print_full_terminal: bool,
 }
 
 impl RatatuiRenderPlugin {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(label: &str, dimensions: (u32, u32)) -> Self {
+        Self {
+            label: label.into(),
+            dimensions,
+            print_full_terminal: false,
+        }
     }
 
-    pub fn add_render(mut self, dimensions: (u32, u32)) -> Self {
-        self.render_configs.push(dimensions);
-        self
-    }
-
-    pub fn print_full_terminal(mut self, index: usize) -> Self {
-        self.print_full_terminal = Some(index);
+    pub fn print_full_terminal(mut self) -> Self {
+        self.print_full_terminal = true;
         self
     }
 }
 
 impl Plugin for RatatuiRenderPlugin {
     fn build(&self, app: &mut App) {
+        if app
+            .world
+            .get_resource_mut::<RatatuiRenderContext>()
+            .is_none()
+        {
+            app.init_resource::<RatatuiRenderContext>()
+                .add_systems(First, receive_rendered_images_system);
+
+            let render_app = app.sub_app_mut(RenderApp);
+
+            let mut graph = render_app.world.resource_mut::<RenderGraph>();
+            graph.add_node(ImageCopy, ImageCopyNode);
+            graph.add_node_edge(bevy::render::graph::CameraDriverLabel, ImageCopy);
+
+            render_app
+                .add_systems(ExtractSchedule, image_copier_extract_system)
+                .add_systems(Render, send_rendered_image_system.after(RenderSet::Render));
+        }
+
         app.add_systems(
             PreStartup,
-            initialize_ratatui_render_context_system_generator(self.render_configs.clone()),
-        )
-        .add_systems(First, receive_rendered_images_system);
+            initialize_context_system_generator(self.label.clone(), self.dimensions),
+        );
 
-        let render_app = app.sub_app_mut(RenderApp);
-
-        let mut graph = render_app.world.resource_mut::<RenderGraph>();
-        graph.add_node(ImageCopy, ImageCopyNode);
-        graph.add_node_edge(bevy::render::graph::CameraDriverLabel, ImageCopy);
-
-        render_app
-            .add_systems(ExtractSchedule, image_copy_source_extract_system)
-            .add_systems(Render, send_rendered_image_system.after(RenderSet::Render));
-
-        if let Some(index) = self.print_full_terminal {
-            app.add_systems(Update, print_full_terminal_system(index).map(error));
+        if self.print_full_terminal {
+            app.add_systems(
+                Update,
+                print_full_terminal_system(self.label.clone()).map(error),
+            );
         }
+    }
+
+    fn is_unique(&self) -> bool {
+        false
     }
 }
 
 /// Resource containing a bevy camera render target and an image that will be updated each frame
 /// with the results of whatever is rendered to that target.
 ///
-/// `target(index)` to clone the render target.
+/// `target(id)` to clone the render target.
 ///
-/// `widget(index)` to generate a ratatui widget that will draw whatever was rendered to the render
+/// `widget(id)` to generate a ratatui widget that will draw whatever was rendered to the render
 /// target in the ratatui frame.
-#[derive(Resource, Default)]
-pub struct RatatuiRenderContext {
-    pub render_pipes: Vec<RatatuiRenderPipe>,
-}
+#[derive(Resource, Default, Deref, DerefMut)]
+pub struct RatatuiRenderContext(HashMap<String, HeadlessRenderPipe>);
 
 impl RatatuiRenderContext {
-    pub fn target(&self, index: usize) -> RenderTarget {
-        self.render_pipes[index].target.clone()
+    pub fn target(&self, id: &str) -> Option<RenderTarget> {
+        let pipe = self.get(id)?;
+        Some(pipe.target.clone())
     }
 
-    pub fn widget(&self, index: usize) -> RatatuiRenderWidget {
-        RatatuiRenderWidget::new(&self.render_pipes[index].image)
+    pub fn widget(&self, id: &str) -> Option<RatatuiRenderWidget> {
+        let pipe = self.get(id)?;
+        Some(RatatuiRenderWidget::new(&pipe.image))
     }
 }
 
+/// Creates a headless render pipe and adds it to the RatatuiRenderContext resource.
+fn initialize_context_system_generator(
+    label: String,
+    dimensions: (u32, u32),
+) -> impl FnMut(Commands, ResMut<Assets<Image>>, Res<RenderDevice>, ResMut<RatatuiRenderContext>) {
+    move |mut commands, mut images, render_device, mut context| {
+        context.insert(
+            label.clone(),
+            HeadlessRenderPipe::new(&mut commands, &mut images, &render_device, dimensions),
+        );
+    }
+}
+
+/// Draws the widget for the provided id in the full terminal, each frame.
 fn print_full_terminal_system(
-    index: usize,
+    id: String,
 ) -> impl FnMut(ResMut<RatatuiContext>, Res<RatatuiRenderContext>) -> io::Result<()> {
     move |mut ratatui, ratatui_render| {
-        ratatui.draw(|frame| {
-            frame.render_widget(ratatui_render.widget(index), frame.size());
-        })?;
+        if let Some(render_widget) = ratatui_render.widget(&id) {
+            ratatui.draw(|frame| {
+                frame.render_widget(render_widget, frame.size());
+            })?;
+        }
 
         Ok(())
     }

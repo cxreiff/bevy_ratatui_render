@@ -39,10 +39,9 @@ fn main() {
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new()
-                .add_render((128, 128))
-                .add_render((128, 128))
-                .add_render((256, 128)),
+            RatatuiRenderPlugin::new("top_left", (128, 128)),
+            RatatuiRenderPlugin::new("top_right", (128, 128)),
+            RatatuiRenderPlugin::new("bottom", (256, 128)),
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
@@ -58,7 +57,7 @@ fn setup_scene_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    rat_render: Res<RatatuiRenderContext>,
+    ratatui_render: Res<RatatuiRenderContext>,
 ) {
     commands.spawn((
         Cube,
@@ -84,7 +83,7 @@ fn setup_scene_system(
         transform: Transform::from_xyz(0., 3., 0.).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target: rat_render.target(0),
+            target: ratatui_render.target("top_left").unwrap(),
             ..default()
         },
         ..default()
@@ -93,7 +92,7 @@ fn setup_scene_system(
         transform: Transform::from_xyz(0., 0., 3.).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target: rat_render.target(1),
+            target: ratatui_render.target("top_right").unwrap(),
             ..default()
         },
         ..default()
@@ -102,7 +101,7 @@ fn setup_scene_system(
         transform: Transform::from_xyz(2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Z),
         tonemapping: Tonemapping::None,
         camera: Camera {
-            target: rat_render.target(2),
+            target: ratatui_render.target("bottom").unwrap(),
             ..default()
         },
         ..default()
@@ -171,13 +170,17 @@ fn draw_scene_system(
         let inner_top_right = top_right_block.inner(top_right);
         let inner_bottom = bottom_block.inner(bottom);
 
+        let top_left_widget = ratatui_render.widget("top_left").unwrap();
+        let top_right_widget = ratatui_render.widget("top_right").unwrap();
+        let bottom_widget = ratatui_render.widget("bottom").unwrap();
+
         frame.render_widget(block, frame.size());
         frame.render_widget(top_left_block, top_left);
         frame.render_widget(bottom_block, top_right);
         frame.render_widget(top_right_block, bottom);
-        frame.render_widget(ratatui_render.widget(0), inner_top_left);
-        frame.render_widget(ratatui_render.widget(1), inner_top_right);
-        frame.render_widget(ratatui_render.widget(2), inner_bottom);
+        frame.render_widget(top_left_widget, inner_top_left);
+        frame.render_widget(top_right_widget, inner_top_right);
+        frame.render_widget(bottom_widget, inner_bottom);
     })?;
 
     Ok(())

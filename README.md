@@ -23,7 +23,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new().add_render((256, 256)),
+            RatatuiRenderPlugin::new("main", (256, 256)),
         ))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, draw_scene_system.map(error))
@@ -42,7 +42,7 @@ fn setup_scene_system(
 
     commands.spawn(Camera3dBundle {
         camera: Camera {
-            target: ratatui_render.target(0),
+            target: ratatui_render.target("main").unwrap(),
             ..default()
         },
         ..default()
@@ -54,7 +54,7 @@ fn draw_scene_system(
     ratatui_render: Res<RatatuiRenderContext>,
 ) -> io::Result<()> {
     ratatui.draw(|frame| {
-        frame.render_widget(ratatui_render.widget(0), frame.size());
+        frame.render_widget(ratatui_render.widget("main").unwrap(), frame.size());
     })?;
 
     Ok(())
@@ -65,7 +65,7 @@ There is a convenience function if you do not need access to the ratatui draw lo
 the render to print to the full terminal (use instead of adding the `draw_scene` system above):
 
 ```rust
-RatatuiRenderPlugin::new().add_render((256, 256)).print_full_terminal(0)
+RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal()
 ```
 
 I also recommend telling bevy you don't need a window or anti-aliasing:
@@ -82,29 +82,21 @@ DefaultPlugins
 
 ## multiple renders
 
-When you call `add_render((width, height))` a new render target and destination will be created,
-associated with an index that increments from zero. For multiple renders, just call `add_render` multiple
-times, and then use the index for the order it was created in the `target(index)`, `widget(index)`, and
-`print_full_terminal(index)` methods (I may implement string IDs in the future, but for now using an
-index kept the code simple).
+`RatatuiRenderPlugin` can be added to bevy multiple times. To access the correct render, use the same
+string id you passed into `RatatuiRenderPlugin::new()` to call the `target(id)` and `widget(id)` methods
+on the `RatatuiRenderContext` resource.
 
 ## supported terminals
 
-This relies on the terminal supporting 24-bit color. I've personality tested and confirmed that the
-following terminals display color correctly:
+Printing to terminal relies on the terminal supporting 24-bit color. I've personality tested and confirmed
+that the following terminals display correctly:
 
 - Alacritty
 - Kitty
 - iTerm
 - WezTerm
 
-## what's next?
-
-I am still refining the interface for creating render targets- I would like devs to be able to identify
-render targets with descriptive string IDs instead of integer indices.
-
-Also, it may be slightly nicer to create multiple render targets by instantiating the plugin multiple
-times, rather than the current builder pattern.
+...but any terminal with 24-bit color support should work fine.
 
 ## credits
 
