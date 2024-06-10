@@ -61,14 +61,16 @@ fn draw_scene_system(
 }
 ```
 
-There is a convenience function if you do not need access to the ratatui draw loop and just would like
-the render to print to the full terminal (use instead of adding the `draw_scene` system above):
+There is a convenience function if you do not need access to the ratatui draw loop and just would
+like the render to print to the full terminal (for the above example, use this instead of adding the
+`draw_scene_system`):
 
 ```rust
 RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal()
 ```
 
-I also recommend telling bevy you don't need a window or anti-aliasing:
+To save a few cpu cycles, I also recommend telling bevy explicitly that you don't need a window or
+anti-aliasing:
 
 ```rust
 DefaultPlugins
@@ -83,12 +85,12 @@ DefaultPlugins
 ## multiple renders
 
 `RatatuiRenderPlugin` can be added to bevy multiple times. To access the correct render, use the same
-string id you passed into `RatatuiRenderPlugin::new()` to call the `target(id)` and `widget(id)` methods
-on the `RatatuiRenderContext` resource.
+string id you passed into `RatatuiRenderPlugin::new(id, dimensions)` to call the `target(id)` and
+`widget(id)` methods on the `RatatuiRenderContext` resource.
 
 ## supported terminals
 
-Printing to terminal relies on the terminal supporting 24-bit color. I've personality tested and confirmed
+Printing to terminal relies on the terminal supporting 24-bit color. I've personally tested and confirmed
 that the following terminals display correctly:
 
 - Alacritty
