@@ -32,8 +32,6 @@ fn main() {
 
 fn setup_scene_system(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     ratatui_render: Res<RatatuiRenderContext>,
 ) {
     // spawn objects into your scene
@@ -61,6 +59,13 @@ fn draw_scene_system(
 }
 ```
 
+As shown above, `RatatuiRenderPlugin` makes a `RatatuiRenderContext` resource available that has two
+methods:
+
+- `target(id)`: Provides a bevy `RenderTarget` that can be set as the `target` of a normal bevy camera.
+- `widget(id)`: Provides a ratatui widget that prints the latest render made to the corresponding camera,
+as unicode half-blocks.
+
 There is a convenience function if you do not need access to the ratatui draw loop and just would
 like the render to print to the full terminal (for the above example, use this instead of adding the
 `draw_scene_system`):
@@ -69,12 +74,10 @@ like the render to print to the full terminal (for the above example, use this i
 RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal()
 ```
 
-To save a few cpu cycles, I also recommend telling bevy explicitly that you don't need a window or
-anti-aliasing:
+To save a few cpu cycles, I also recommend telling bevy explicitly that you don't need a window:
 
 ```rust
 DefaultPlugins
-    .set(ImagePlugin::default_nearest())
     .set(WindowPlugin {
         primary_window: None,
         exit_condition: ExitCondition::DontExit,
