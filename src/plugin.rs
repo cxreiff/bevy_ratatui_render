@@ -64,17 +64,45 @@ pub struct RatatuiRenderPlugin {
     label: String,
     dimensions: (u32, u32),
     print_full_terminal: bool,
+    disabled: bool,
 }
 
 impl RatatuiRenderPlugin {
+    /// Create an instance of RatatuiRenderPlugin.
+    ///
+    /// * `label` - Unique descriptive identifier. To access the render target and ratatui widget
+    /// created by this instance of the plugin, pass the same string into the `target(id)` and
+    /// `widget(id)` methods on the `RatatuiRenderContext` resource.
+    ///
+    /// * `dimensions` - (width, height) - the dimensions of the texture that will be rendered to.
     pub fn new(label: &str, dimensions: (u32, u32)) -> Self {
         Self {
             label: label.into(),
             dimensions,
             print_full_terminal: false,
+            disabled: false,
         }
     }
 
+    /// Initializes RatatuiRenderContext resource but skips setting up the headless rendering.
+    /// `target(id)` and `widget(id)` on the context resource will each return None.
+    ///
+    /// Working on a bevy application that renders to the terminal, you may occasionally want to
+    /// see your application running in a normal window for debugging or convenience. Calling this
+    /// method on the plugin allows you to test your bevy app in a window without being forced to
+    /// comment out every bevy system with `Res<RatatuiRenderContext>` as a parameter.
+    ///
+    /// Refer to the `disable` example for a bevy app that gracefully falls back to a normal window
+    /// when `disabled()` is used (for example, passing along normal bevy input events to your
+    /// terminal keyboard event handlers).
+    pub fn disable(mut self) -> Self {
+        self.disabled = true;
+        self
+    }
+
+    /// Adds a bevy system that draws the ratatui widget containing your bevy application's render
+    /// output to the full terminal each frame (preserving aspect ratio). If you don't need to
+    /// customize the ratatui draw loop, use this to cut out some boilerplate.
     pub fn print_full_terminal(mut self) -> Self {
         self.print_full_terminal = true;
         self
@@ -83,6 +111,11 @@ impl RatatuiRenderPlugin {
 
 impl Plugin for RatatuiRenderPlugin {
     fn build(&self, app: &mut App) {
+        if self.disabled {
+            app.init_resource::<RatatuiRenderContext>();
+            return;
+        }
+
         if app
             .world
             .get_resource_mut::<RatatuiRenderContext>()
@@ -131,11 +164,20 @@ impl Plugin for RatatuiRenderPlugin {
 pub struct RatatuiRenderContext(HashMap<String, HeadlessRenderPipe>);
 
 impl RatatuiRenderContext {
+    /// Gets a clone of the render target, for placement inside a bevy camera.
+    ///
+    /// * `id` - Unique descriptive identifier, must match the id provided when the corresponding
+    /// `RatatuiRenderPlugin` was instantiated.
     pub fn target(&self, id: &str) -> Option<RenderTarget> {
         let pipe = self.get(id)?;
         Some(pipe.target.clone())
     }
 
+    /// Gets a ratatui widget, that when drawn will print the most recent image rendered to the
+    /// render target of the same id.
+    ///
+    /// * `id` - Unique descriptive identifier, must match the id provided when the corresponding
+    /// `RatatuiRenderPlugin` was instantiated.
     pub fn widget(&self, id: &str) -> Option<RatatuiRenderWidget> {
         let pipe = self.get(id)?;
         Some(RatatuiRenderWidget::new(&pipe.image))
