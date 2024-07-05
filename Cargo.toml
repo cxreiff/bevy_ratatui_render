@@ -15,9 +15,9 @@ keywords = ["bevy", "ratatui", "terminal", "tui", "render"]
 bevy = { version = "0.14", features = ["dynamic_linking"] }
 crossterm = "0.27.0"
 crossbeam-channel = "0.5.13"
-ratatui = "=0.27.0"
+ratatui = "0.27"
 ratatui-image = "1.0.2"
-bevy_ratatui = "0.5.3"
+bevy_ratatui = "0.6"
 
 [profile.dev]
 opt-level = 1

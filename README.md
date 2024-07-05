@@ -101,7 +101,14 @@ that the following terminals display correctly:
 - iTerm
 - WezTerm
 
-...but any terminal with 24-bit color support should work fine.
+...but any terminal with 24-bit color support should work fine, if its performance is adequate.
+
+## compatibility
+
+| bevy  | bevy_ratatui_render |
+|-------|---------------------|
+| 0.14  | 0.5                 |
+| 0.13  | 0.4                 |
 
 ## credits
 
