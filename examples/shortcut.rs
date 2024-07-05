@@ -26,7 +26,7 @@ fn main() {
             RatatuiPlugins::default(),
             RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal(),
         ))
-        .insert_resource(ClearColor(Color::srgb(0., 0., 0.)))
+        .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, handle_input_system)
         .add_systems(Update, rotate_cube_system.after(handle_input_system))

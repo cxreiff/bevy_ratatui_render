@@ -43,7 +43,7 @@ fn main() {
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
-        .insert_resource(ClearColor(Color::srgb(0., 0., 0.)))
+        .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, draw_scene_system.map(error))
         .add_systems(PreUpdate, handle_input_system)

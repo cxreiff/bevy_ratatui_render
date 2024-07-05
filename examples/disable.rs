@@ -26,7 +26,7 @@ fn main() {
             RatatuiPlugins::default(),
             RatatuiRenderPlugin::new("main", (256, 256)).disable(),
         ))
-        .insert_resource(ClearColor(Color::srgb(0., 0., 0.)))
+        .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_camera_system)
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, draw_scene_system.map(error))
