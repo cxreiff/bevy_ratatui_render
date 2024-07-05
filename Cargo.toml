@@ -12,7 +12,7 @@ categories = ["game-engines", "gui", "rendering", "command-line-interface"]
 keywords = ["bevy", "ratatui", "terminal", "tui", "render"]
 
 [dependencies]
-bevy = { version = "0.14", features = ["dynamic_linking"] }
+bevy = "0.14"
 crossterm = "0.27.0"
 crossbeam-channel = "0.5.13"
 ratatui = "0.27"
