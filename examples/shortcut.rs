@@ -26,7 +26,7 @@ fn main() {
             RatatuiPlugins::default(),
             RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal(),
         ))
-        .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
+        .insert_resource(ClearColor(Color::srgb(0., 0., 0.)))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, handle_input_system)
         .add_systems(Update, rotate_cube_system.after(handle_input_system))
@@ -44,7 +44,7 @@ fn setup_scene_system(
         PbrBundle {
             mesh: meshes.add(Cuboid::default()),
             material: materials.add(StandardMaterial {
-                base_color: bevy::prelude::Color::rgb(100. / 256., 140. / 256., 180. / 256.),
+                base_color: Color::srgb(0.4, 0.54, 0.7),
                 ..Default::default()
             }),
             transform: Transform::default(),
@@ -77,10 +77,10 @@ fn setup_scene_system(
 }
 
 pub fn handle_input_system(mut rat_events: EventReader<KeyEvent>, mut exit: EventWriter<AppExit>) {
-    for KeyEvent(key_event) in rat_events.read() {
+    for key_event in rat_events.read() {
         if let KeyEventKind::Press | KeyEventKind::Repeat = key_event.kind {
             if let KeyCode::Char('q') = key_event.code {
-                exit.send(AppExit);
+                exit.send_default();
             }
         }
     }

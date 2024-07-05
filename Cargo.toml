@@ -12,12 +12,12 @@ categories = ["game-engines", "gui", "rendering", "command-line-interface"]
 keywords = ["bevy", "ratatui", "terminal", "tui", "render"]
 
 [dependencies]
-bevy = { version = "0.13.2", features = ["dynamic_linking"] }
+bevy = { version = "0.14", features = ["dynamic_linking"] }
 crossterm = "0.27.0"
-crossbeam-channel = "0.5.12"
-ratatui = "0.26.3"
-ratatui-image = "=1.0.0"
-bevy_ratatui = "0.5.1"
+crossbeam-channel = "0.5.13"
+ratatui = "=0.27.0"
+ratatui-image = "1.0.2"
+bevy_ratatui = "0.5.3"
 
 [profile.dev]
 opt-level = 1

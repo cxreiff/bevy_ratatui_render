@@ -20,7 +20,7 @@ use bevy::{
             TextureUsages,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
-        texture::{BevyDefault, TextureFormatPixelInfo},
+        texture::{BevyDefault, GpuImage, TextureFormatPixelInfo},
         Extract,
     },
 };
@@ -182,7 +182,7 @@ impl Node for ImageCopyNode {
         world: &World,
     ) -> Result<(), NodeRunError> {
         let image_copy_sources = world.get_resource::<ImageCopiers>().unwrap();
-        let gpu_images = world.get_resource::<RenderAssets<Image>>().unwrap();
+        let gpu_images = world.get_resource::<RenderAssets<GpuImage>>().unwrap();
 
         for image_copy_source in image_copy_sources.iter() {
             if !image_copy_source.enabled() {
@@ -203,8 +203,8 @@ impl Node for ImageCopyNode {
             );
 
             let texture_extent = Extent3d {
-                width: src_image.size.x as u32,
-                height: src_image.size.y as u32,
+                width: src_image.size.x,
+                height: src_image.size.y,
                 depth_or_array_layers: 1,
             };
 
