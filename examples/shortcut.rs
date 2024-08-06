@@ -24,7 +24,9 @@ fn main() {
                 }),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal(),
+            RatatuiRenderPlugin::new("main", (256, 256))
+                .print_full_terminal()
+                .autoresize(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_scene_system)

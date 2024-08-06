@@ -1,7 +1,7 @@
 use std::io;
 
 use bevy::{
-    ecs::system::RunSystemOnce,
+    ecs::system::{RunSystemOnce, SystemState},
     prelude::*,
     render::{
         camera::RenderTarget, render_graph::RenderGraph, renderer::RenderDevice, Render, RenderApp,
@@ -9,7 +9,7 @@ use bevy::{
     },
     utils::{error, hashbrown::HashMap},
 };
-use bevy_ratatui::terminal::RatatuiContext;
+use bevy_ratatui::{event::ResizeEvent, terminal::RatatuiContext};
 
 use crate::{
     headless::{
@@ -18,6 +18,9 @@ use crate::{
     },
     RatatuiRenderWidget,
 };
+
+/// Function that converts terminal dimensions to render texture dimensions.
+pub type AutoresizeConversionFn = fn((u32, u32)) -> (u32, u32);
 
 /// Sets up headless rendering and makes the `RatatuiRenderContext` resource available
 /// to use in your camera and ratatui draw loop.
@@ -33,6 +36,9 @@ use crate::{
 /// Use `print_full_terminal()` to add a minimal ratatui draw loop that just draws the render
 /// to the full terminal window.
 ///
+/// Use `autoresize()` to automatically match the render image to the terminal dimensions during
+/// startup and when the terminal is resized.
+///
 /// # example:
 /// ```no_run
 /// # use bevy::prelude::*;
@@ -44,7 +50,7 @@ use crate::{
 ///         .add_plugins((
 ///             DefaultPlugins,
 ///             RatatuiPlugins::default(),
-///             RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal(),
+///             RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal().autoresize(),
 ///         ))
 ///         .add_systems(Startup, setup_scene);
 /// }
@@ -62,25 +68,29 @@ use crate::{
 /// }
 /// ```
 pub struct RatatuiRenderPlugin {
-    label: String,
+    id: String,
     dimensions: (u32, u32),
     print_full_terminal: bool,
+    autoresize: bool,
+    autoresize_conversion_fn: Option<AutoresizeConversionFn>,
     disabled: bool,
 }
 
 impl RatatuiRenderPlugin {
     /// Create an instance of RatatuiRenderPlugin.
     ///
-    /// * `label` - Unique descriptive identifier. To access the render target and ratatui widget
+    /// * `id` - Unique descriptive identifier. To access the render target and ratatui widget
     ///   created by this instance of the plugin, pass the same string into the `target(id)` and
     ///   `widget(id)` methods on the `RatatuiRenderContext` resource.
     ///
     /// * `dimensions` - (width, height) - the dimensions of the texture that will be rendered to.
-    pub fn new(label: &str, dimensions: (u32, u32)) -> Self {
+    pub fn new(id: &str, dimensions: (u32, u32)) -> Self {
         Self {
-            label: label.into(),
+            id: id.into(),
             dimensions,
             print_full_terminal: false,
+            autoresize: false,
+            autoresize_conversion_fn: None,
             disabled: false,
         }
     }
@@ -106,6 +116,47 @@ impl RatatuiRenderPlugin {
     /// customize the ratatui draw loop, use this to cut out some boilerplate.
     pub fn print_full_terminal(mut self) -> Self {
         self.print_full_terminal = true;
+        self
+    }
+
+    /// Adds a bevy system that listens for terminal resize events and resizes the render texture
+    /// to match the new dimensions.
+    pub fn autoresize(mut self) -> Self {
+        self.autoresize = true;
+        self
+    }
+
+    /// Supply a function to customize how the render texture dimensions are calculated from the
+    /// terminal dimensions. By default the ratio is 2-to-1, 2 pixels per character width and per
+    /// character height.
+    ///
+    /// For example, if you are planning on displaying the bevy render on the left half of the
+    /// terminal, keeping the right half free for other ratatui widgets, you could use the
+    /// following function to resize the texture appropriately:
+    ///
+    /// ```no_run
+    /// # use bevy::prelude::*;
+    /// # use bevy_ratatui::RatatuiPlugins;
+    /// # use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
+    /// #
+    /// # fn main() {
+    /// # App::new()
+    /// #    .add_plugins((
+    /// #        DefaultPlugins,
+    /// #        RatatuiPlugins::default(),
+    /// #
+    /// RatatuiRenderPlugin::new("main", (0, 0))
+    ///     .autoresize()
+    ///     .autoresize_conversion_fn(|(width, height)| (width / 2, height)),
+    /// #
+    /// #    ));
+    /// # }
+    /// ```
+    pub fn autoresize_conversion_fn(
+        mut self,
+        autoresize_conversion_fn: AutoresizeConversionFn,
+    ) -> Self {
+        self.autoresize_conversion_fn = Some(autoresize_conversion_fn);
         self
     }
 }
@@ -140,14 +191,22 @@ impl Plugin for RatatuiRenderPlugin {
 
         app.add_systems(
             PreStartup,
-            initialize_context_system_generator(self.label.clone(), self.dimensions),
+            initialize_context_system_generator(self.id.clone(), self.dimensions),
         );
 
         if self.print_full_terminal {
             app.add_systems(
                 Update,
-                print_full_terminal_system(self.label.clone()).map(error),
+                print_full_terminal_system(self.id.clone()).map(error),
             );
+        }
+
+        if self.autoresize {
+            app.add_systems(PostStartup, initial_resize_system)
+                .add_systems(
+                    PostUpdate,
+                    autoresize_system_generator(self.id.clone(), self.autoresize_conversion_fn),
+                );
         }
     }
 
@@ -209,15 +268,9 @@ impl RatatuiRenderContext {
     }
 }
 
-#[derive(Event)]
-pub struct ReplacedRenderPipeEvent {
-    old_render_target: RenderTarget,
-    new_render_target: RenderTarget,
-}
-
 /// Creates a headless render pipe and adds it to the RatatuiRenderContext resource.
 fn initialize_context_system_generator(
-    label: String,
+    id: String,
     dimensions: (u32, u32),
 ) -> impl FnMut(
     Commands,
@@ -230,7 +283,7 @@ fn initialize_context_system_generator(
         let new_pipe =
             HeadlessRenderPipe::new(&mut commands, &mut images, &render_device, dimensions);
         let new_pipe_target = new_pipe.target.clone();
-        let maybe_old_pipe = context.insert(label.clone(), new_pipe);
+        let maybe_old_pipe = context.insert(id.clone(), new_pipe);
 
         if let Some(old_pipe) = maybe_old_pipe {
             replaced_pipe.send(ReplacedRenderPipeEvent {
@@ -241,6 +294,57 @@ fn initialize_context_system_generator(
     }
 }
 
+/// Draws the widget for the provided id in the full terminal, each frame.
+fn print_full_terminal_system(
+    id: String,
+) -> impl FnMut(ResMut<RatatuiContext>, Res<RatatuiRenderContext>) -> io::Result<()> {
+    move |mut ratatui, ratatui_render| {
+        if let Some(render_widget) = ratatui_render.widget(&id) {
+            ratatui.draw(|frame| {
+                frame.render_widget(render_widget, frame.size());
+            })?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Sends a single resize event during startup when autoresize is enabled.
+fn initial_resize_system(
+    ratatui: Res<RatatuiContext>,
+    mut resize_events: EventWriter<ResizeEvent>,
+) {
+    if let Ok(size) = ratatui.size() {
+        resize_events.send(ResizeEvent(size.into()));
+    }
+}
+
+/// Autoresizes the render texture to fit the terminal dimensions.
+fn autoresize_system_generator(
+    id: String,
+    conversion_fn: Option<AutoresizeConversionFn>,
+) -> impl FnMut(&mut World) {
+    move |world| {
+        let mut system_state: SystemState<EventReader<ResizeEvent>> = SystemState::new(world);
+        let mut ratatui_events = system_state.get_mut(world);
+
+        if let Some(ResizeEvent(dimensions)) = ratatui_events.read().last() {
+            let terminal_dimensions = (dimensions.width as u32, dimensions.height as u32 * 2);
+            let conversion_fn = conversion_fn.unwrap_or(|(width, height)| (width * 2, height * 2));
+            let new_dimensions = conversion_fn(terminal_dimensions);
+            RatatuiRenderContext::create(&id, new_dimensions, world);
+        }
+    }
+}
+
+#[derive(Event)]
+pub struct ReplacedRenderPipeEvent {
+    old_render_target: RenderTarget,
+    new_render_target: RenderTarget,
+}
+
+/// When a new render pipe is created with an existing name, the old pipe is replaced.
+/// This system cleans up assets and components from the old pipe.
 fn replaced_pipe_cleanup_system(
     mut commands: Commands,
     mut replaced_pipe: EventReader<ReplacedRenderPipeEvent>,
@@ -276,20 +380,5 @@ fn replaced_pipe_cleanup_system(
                 images.remove(&image_copier.src_image.clone());
             }
         };
-    }
-}
-
-/// Draws the widget for the provided id in the full terminal, each frame.
-fn print_full_terminal_system(
-    id: String,
-) -> impl FnMut(ResMut<RatatuiContext>, Res<RatatuiRenderContext>) -> io::Result<()> {
-    move |mut ratatui, ratatui_render| {
-        if let Some(render_widget) = ratatui_render.widget(&id) {
-            ratatui.draw(|frame| {
-                frame.render_widget(render_widget, frame.size());
-            })?;
-        }
-
-        Ok(())
     }
 }

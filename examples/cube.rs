@@ -39,7 +39,7 @@ fn main() {
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new("main", (256, 256)),
+            RatatuiRenderPlugin::new("main", (256, 256)).autoresize(),
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)

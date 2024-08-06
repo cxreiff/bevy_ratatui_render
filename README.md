@@ -60,7 +60,7 @@ fn draw_scene_system(
 ```
 
 As shown above, `RatatuiRenderPlugin` makes a `RatatuiRenderContext` resource available that has two
-methods:
+primary methods:
 
 - `target(id)`: Provides a bevy `RenderTarget` that can be set as the `target` of a normal bevy camera.
 - `widget(id)`: Provides a ratatui widget that prints the latest render made to the corresponding camera,
@@ -72,6 +72,22 @@ like the render to print to the full terminal (for the above example, use this i
 
 ```rust
 RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal()
+```
+
+There is another convenience function for autoresizing the render texture to match the terminal
+dimensions, during startup and when the terminal is resized:
+
+```rust
+RatatuiRenderPlugin::new("main", (1, 1)).autoresize()
+```
+
+To customize how the texture dimensions are calculated from the terminal dimensions, provide a callback
+to `autoresize_conversion_fn`:
+
+```rust
+RatatuiRenderPlugin::new("main", (1, 1))
+    .autoresize()
+    .autoresize_conversion_fn(|(width, height)| (width * 4, height * 3))
 ```
 
 To save a few cpu cycles, I also recommend telling bevy explicitly that you don't need a window:

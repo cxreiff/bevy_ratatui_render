@@ -2,10 +2,9 @@ use std::time::Duration;
 
 use bevy::app::AppExit;
 use bevy::core_pipeline::tonemapping::Tonemapping;
-use bevy::ecs::system::SystemState;
 use bevy::window::ExitCondition;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
-use bevy_ratatui::event::{KeyEvent, ResizeEvent};
+use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::RatatuiPlugins;
 use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
 use crossterm::event::{KeyCode, KeyEventKind};
@@ -25,12 +24,16 @@ fn main() {
                 }),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal(),
+            // Dimensions are (1,1) because it will be resized anyways during startup. Width and
+            // height each need to be at least 1 or there will be a panic setting up the buffers.
+            RatatuiRenderPlugin::new("main", (1, 1))
+                .print_full_terminal()
+                .autoresize()
+                .autoresize_conversion_fn(|(width, height)| (width * 16, height * 9)),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, handle_input_system)
-        .add_systems(Update, handle_resize_system)
         .add_systems(Update, rotate_cube_system.after(handle_input_system))
         .run();
 }
@@ -88,19 +91,6 @@ pub fn handle_input_system(
                 exit.send_default();
             }
         }
-    }
-}
-
-pub fn handle_resize_system(world: &mut World) {
-    let mut system_state: SystemState<EventReader<ResizeEvent>> = SystemState::new(world);
-    let mut ratatui_events = system_state.get_mut(world);
-
-    if let Some(ResizeEvent(dimensions)) = ratatui_events.read().last() {
-        RatatuiRenderContext::create(
-            "main",
-            (dimensions.width as u32, dimensions.height as u32 * 2),
-            world,
-        );
     }
 }
 
