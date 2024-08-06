@@ -36,7 +36,7 @@ pub struct ImageCopier {
     sender: Sender<Vec<u8>>,
     buffer: Buffer,
     enabled: Arc<AtomicBool>,
-    src_image: Handle<Image>,
+    pub src_image: Handle<Image>,
 }
 
 impl ImageCopier {
@@ -77,8 +77,8 @@ pub struct HeadlessRenderPipe {
 impl HeadlessRenderPipe {
     pub fn new(
         commands: &mut Commands,
-        images: &mut ResMut<Assets<Image>>,
-        render_device: &Res<RenderDevice>,
+        images: &mut Assets<Image>,
+        render_device: &RenderDevice,
         dimensions: (u32, u32),
     ) -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded();

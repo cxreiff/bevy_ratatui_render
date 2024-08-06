@@ -1,6 +1,7 @@
 use std::io;
 
 use bevy::{
+    ecs::system::RunSystemOnce,
     prelude::*,
     render::{
         camera::RenderTarget, render_graph::RenderGraph, renderer::RenderDevice, Render, RenderApp,
@@ -13,7 +14,7 @@ use bevy_ratatui::terminal::RatatuiContext;
 use crate::{
     headless::{
         image_copier_extract_system, receive_rendered_images_system, send_rendered_image_system,
-        HeadlessRenderPipe, ImageCopy, ImageCopyNode,
+        HeadlessRenderPipe, ImageCopier, ImageCopy, ImageCopyNode,
     },
     RatatuiRenderWidget,
 };
@@ -71,8 +72,8 @@ impl RatatuiRenderPlugin {
     /// Create an instance of RatatuiRenderPlugin.
     ///
     /// * `label` - Unique descriptive identifier. To access the render target and ratatui widget
-    /// created by this instance of the plugin, pass the same string into the `target(id)` and
-    /// `widget(id)` methods on the `RatatuiRenderContext` resource.
+    ///   created by this instance of the plugin, pass the same string into the `target(id)` and
+    ///   `widget(id)` methods on the `RatatuiRenderContext` resource.
     ///
     /// * `dimensions` - (width, height) - the dimensions of the texture that will be rendered to.
     pub fn new(label: &str, dimensions: (u32, u32)) -> Self {
@@ -122,7 +123,9 @@ impl Plugin for RatatuiRenderPlugin {
             .is_none()
         {
             app.init_resource::<RatatuiRenderContext>()
-                .add_systems(First, receive_rendered_images_system);
+                .add_systems(First, receive_rendered_images_system)
+                .add_systems(PostUpdate, replaced_pipe_cleanup_system)
+                .add_event::<ReplacedRenderPipeEvent>();
 
             let render_app = app.sub_app_mut(RenderApp);
 
@@ -164,36 +167,115 @@ impl Plugin for RatatuiRenderPlugin {
 pub struct RatatuiRenderContext(HashMap<String, HeadlessRenderPipe>);
 
 impl RatatuiRenderContext {
+    /// Create a render image for the given id. If an existing id is supplied, the existing render
+    /// image is replaced.
+    ///
+    /// * `id` - Unique descriptive identifier, must match the id provided when the corresponding
+    ///   `RatatuiRenderPlugin` was instantiated.
+    ///
+    /// * `dimensions` - New dimensions for the render image (`(width: u32, height: u32)`).
+    ///
+    /// * `world` - Mutable reference to Bevy world.
+    pub fn create(id: &str, dimensions: (u32, u32), world: &mut World) {
+        world.run_system_once(initialize_context_system_generator(id.into(), dimensions));
+    }
+
     /// Gets a clone of the render target, for placement inside a bevy camera.
     ///
     /// * `id` - Unique descriptive identifier, must match the id provided when the corresponding
-    /// `RatatuiRenderPlugin` was instantiated.
+    ///   `RatatuiRenderPlugin` was instantiated.
     pub fn target(&self, id: &str) -> Option<RenderTarget> {
         let pipe = self.get(id)?;
         Some(pipe.target.clone())
+    }
+
+    /// Gets the dimensions of a given render image.
+    ///
+    /// * `id` - Unique descriptive identifier, must match the id provided when the corresponding
+    ///   `RatatuiRenderPlugin` was instantiated.
+    pub fn dimensions(&self, id: &str) -> Option<(u32, u32)> {
+        let pipe = self.get(id)?;
+        Some((pipe.image.width(), pipe.image.height()))
     }
 
     /// Gets a ratatui widget, that when drawn will print the most recent image rendered to the
     /// render target of the same id.
     ///
     /// * `id` - Unique descriptive identifier, must match the id provided when the corresponding
-    /// `RatatuiRenderPlugin` was instantiated.
+    ///   `RatatuiRenderPlugin` was instantiated.
     pub fn widget(&self, id: &str) -> Option<RatatuiRenderWidget> {
         let pipe = self.get(id)?;
         Some(RatatuiRenderWidget::new(&pipe.image))
     }
 }
 
+#[derive(Event)]
+pub struct ReplacedRenderPipeEvent {
+    old_render_target: RenderTarget,
+    new_render_target: RenderTarget,
+}
+
 /// Creates a headless render pipe and adds it to the RatatuiRenderContext resource.
 fn initialize_context_system_generator(
     label: String,
     dimensions: (u32, u32),
-) -> impl FnMut(Commands, ResMut<Assets<Image>>, Res<RenderDevice>, ResMut<RatatuiRenderContext>) {
-    move |mut commands, mut images, render_device, mut context| {
-        context.insert(
-            label.clone(),
-            HeadlessRenderPipe::new(&mut commands, &mut images, &render_device, dimensions),
-        );
+) -> impl FnMut(
+    Commands,
+    ResMut<Assets<Image>>,
+    Res<RenderDevice>,
+    ResMut<RatatuiRenderContext>,
+    EventWriter<ReplacedRenderPipeEvent>,
+) {
+    move |mut commands, mut images, render_device, mut context, mut replaced_pipe| {
+        let new_pipe =
+            HeadlessRenderPipe::new(&mut commands, &mut images, &render_device, dimensions);
+        let new_pipe_target = new_pipe.target.clone();
+        let maybe_old_pipe = context.insert(label.clone(), new_pipe);
+
+        if let Some(old_pipe) = maybe_old_pipe {
+            replaced_pipe.send(ReplacedRenderPipeEvent {
+                old_render_target: old_pipe.target,
+                new_render_target: new_pipe_target,
+            });
+        }
+    }
+}
+
+fn replaced_pipe_cleanup_system(
+    mut commands: Commands,
+    mut replaced_pipe: EventReader<ReplacedRenderPipeEvent>,
+    mut images: ResMut<Assets<Image>>,
+    mut camera_query: Query<&mut Camera>,
+    mut image_copier_query: Query<(Entity, &mut ImageCopier)>,
+) {
+    for ReplacedRenderPipeEvent {
+        old_render_target,
+        new_render_target,
+    } in replaced_pipe.read()
+    {
+        if let Some(old_target_image) = old_render_target.as_image() {
+            if let Some(mut camera) = camera_query.iter_mut().find(|camera| {
+                if let Some(camera_image) = camera.target.as_image() {
+                    return camera_image == old_target_image;
+                }
+
+                false
+            }) {
+                camera.target = new_render_target.clone();
+                if let Some(image_handle) = old_render_target.as_image() {
+                    images.remove(image_handle);
+                }
+            }
+
+            if let Some((entity, image_copier)) = image_copier_query
+                .iter_mut()
+                .find(|(_, image_copier)| image_copier.src_image == *old_target_image)
+            {
+                commands.entity(entity).despawn();
+
+                images.remove(&image_copier.src_image.clone());
+            }
+        };
     }
 }
 
