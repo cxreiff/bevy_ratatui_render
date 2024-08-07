@@ -1,0 +1,11 @@
+name: test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    uses: cxreiff/github_workflows/.github/workflows/rust_test.yml@main
