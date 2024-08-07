@@ -202,11 +202,18 @@ impl Plugin for RatatuiRenderPlugin {
         }
 
         if self.autoresize {
-            app.add_systems(PostStartup, initial_resize_system)
-                .add_systems(
-                    PostUpdate,
+            app.add_systems(
+                PostStartup,
+                (
+                    initial_resize_system,
                     autoresize_system_generator(self.id.clone(), self.autoresize_conversion_fn),
-                );
+                )
+                    .chain(),
+            )
+            .add_systems(
+                PostUpdate,
+                autoresize_system_generator(self.id.clone(), self.autoresize_conversion_fn),
+            );
         }
     }
 

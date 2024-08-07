@@ -29,7 +29,7 @@ fn main() {
             RatatuiRenderPlugin::new("main", (1, 1))
                 .print_full_terminal()
                 .autoresize()
-                .autoresize_conversion_fn(|(width, height)| (width * 16, height * 9)),
+                .autoresize_conversion_fn(|(width, height)| (width * 4, height * 3)),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_scene_system)
