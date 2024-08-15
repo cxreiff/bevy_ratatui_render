@@ -1,4 +1,4 @@
-name: check
+name: checks
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  check:
+  checks:
     permissions:
       checks: write
-    uses: cxreiff/github_workflows/.github/workflows/rust_check.yml@main
+    uses: cxreiff/github_workflows/.github/workflows/rust_checks.yml@main

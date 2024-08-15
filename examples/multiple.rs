@@ -151,7 +151,7 @@ fn draw_scene_system(
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(block.inner(frame.size()));
+            .split(block.inner(frame.area()));
 
         let top_layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -174,7 +174,7 @@ fn draw_scene_system(
         let top_right_widget = ratatui_render.widget("top_right").unwrap();
         let bottom_widget = ratatui_render.widget("bottom").unwrap();
 
-        frame.render_widget(block, frame.size());
+        frame.render_widget(block, frame.area());
         frame.render_widget(top_left_block, top_left);
         frame.render_widget(bottom_block, top_right);
         frame.render_widget(top_right_block, bottom);

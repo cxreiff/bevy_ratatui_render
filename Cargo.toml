@@ -13,11 +13,11 @@ keywords = ["bevy", "ratatui", "terminal", "tui", "render"]
 
 [dependencies]
 bevy = "0.14"
-crossterm = "0.27.0"
+crossterm = "0.28.0"
 crossbeam-channel = "0.5.13"
-ratatui = "0.27"
-ratatui-image = "1.0.2"
-bevy_ratatui = "0.6.1"
+ratatui = "0.28.0"
+ratatui-image = "1.0.5"
+bevy_ratatui = "0.6.2"
 
 [profile.dev]
 opt-level = 1

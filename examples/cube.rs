@@ -110,7 +110,7 @@ fn draw_scene_system(
             .title_bottom("[p for panic]")
             .title_alignment(Alignment::Center);
 
-        let inner = block.inner(frame.size());
+        let inner = block.inner(frame.area());
 
         if flags.debug {
             block = block.title_top(format!(
@@ -130,7 +130,7 @@ fn draw_scene_system(
             }
         }
 
-        frame.render_widget(block, frame.size());
+        frame.render_widget(block, frame.area());
         frame.render_widget(rat_render.widget("main").unwrap(), inner);
     })?;
 

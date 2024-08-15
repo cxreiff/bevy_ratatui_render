@@ -308,7 +308,7 @@ fn print_full_terminal_system(
     move |mut ratatui, ratatui_render| {
         if let Some(render_widget) = ratatui_render.widget(&id) {
             ratatui.draw(|frame| {
-                frame.render_widget(render_widget, frame.size());
+                frame.render_widget(render_widget, frame.area());
             })?;
         }
 
@@ -322,7 +322,7 @@ fn initial_resize_system(
     mut resize_events: EventWriter<ResizeEvent>,
 ) {
     if let Ok(size) = ratatui.size() {
-        resize_events.send(ResizeEvent(size.into()));
+        resize_events.send(ResizeEvent(size));
     }
 }
 

@@ -1,0 +1,13 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  tests:
+    uses: cxreiff/github_workflows/.github/workflows/rust_tests.yml@main
+    with:
+      linux_dependencies: "libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev"

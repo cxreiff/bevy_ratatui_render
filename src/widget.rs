@@ -1,5 +1,6 @@
 use bevy::render::texture::Image;
 use ratatui::prelude::*;
+use ratatui::widgets::Widget;
 use ratatui_image::{
     picker::{Picker, ProtocolType},
     FilterType, Resize,

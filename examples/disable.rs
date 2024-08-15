@@ -58,7 +58,7 @@ fn draw_scene_system(
 ) -> io::Result<()> {
     ratatui.draw(|frame| {
         if let Some(widget) = rat_render.widget("main") {
-            frame.render_widget(widget, frame.size());
+            frame.render_widget(widget, frame.area());
         }
     })?;
 
