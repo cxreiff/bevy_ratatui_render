@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.5...v0.5.6) - 2024-08-15
+
+### Other
+- version bumps, workflow updates
+
 ## [0.5.5](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.4...v0.5.5) - 2024-08-07
 
 ### Other
