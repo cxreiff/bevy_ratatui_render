@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use bevy::app::AppExit;
+use bevy::app::ScheduleRunnerPlugin;
 use bevy::core_pipeline::tonemapping::Tonemapping;
-use bevy::window::ExitCondition;
-use bevy::{app::ScheduleRunnerPlugin, prelude::*};
+use bevy::prelude::*;
+use bevy::winit::WinitPlugin;
 use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::RatatuiPlugins;
 use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
@@ -17,16 +18,10 @@ fn main() {
         .add_plugins((
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
-                .set(WindowPlugin {
-                    primary_window: None,
-                    exit_condition: ExitCondition::DontExit,
-                    close_when_requested: false,
-                }),
+                .disable::<WinitPlugin>(),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             RatatuiPlugins::default(),
-            // Dimensions are (1,1) because it will be resized anyways during startup. Width and
-            // height each need to be at least 1 or there will be a panic setting up the buffers.
-            RatatuiRenderPlugin::new("main", (1, 1))
+            RatatuiRenderPlugin::new("main", (256, 256))
                 .print_full_terminal()
                 .autoresize()
                 .autoresize_conversion_fn(|(width, height)| (width * 4, height * 3)),

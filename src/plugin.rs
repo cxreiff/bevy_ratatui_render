@@ -41,6 +41,9 @@ pub type AutoresizeConversionFn = fn((u32, u32)) -> (u32, u32);
 ///
 /// # example:
 /// ```no_run
+/// # use std::time::Duration;
+/// # use bevy::app::ScheduleRunnerPlugin;
+/// # use bevy::winit::WinitPlugin;
 /// # use bevy::prelude::*;
 /// # use bevy_ratatui::RatatuiPlugins;
 /// # use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
@@ -48,8 +51,16 @@ pub type AutoresizeConversionFn = fn((u32, u32)) -> (u32, u32);
 /// fn main() {
 ///     App::new()
 ///         .add_plugins((
-///             DefaultPlugins,
+///             // Disable WinitPlugin to avoid a panic in environments without a display server.
+///             DefaultPlugins.build().disable::<WinitPlugin>(),
+///
+///             // Create windowless loop and set its duration per frame (inverse of frame rate).
+///             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
+///
+///             // RatatuiPlugins sets up the Ratatui context and forwards input events.
 ///             RatatuiPlugins::default(),
+///
+///             // RatatuiRenderPlugin connects a bevy camera target to a ratatui widget.
 ///             RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal().autoresize(),
 ///         ))
 ///         .add_systems(Startup, setup_scene);

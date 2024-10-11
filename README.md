@@ -6,7 +6,11 @@ Uses bevy headless rendering, [ratatui](https://github.com/ratatui-org/ratatui),
 [ratatui_image](https://github.com/benjajaja/ratatui-image) to print the rendered output
 of your bevy application to the terminal using unicode halfblocks.
 
-![cube example](https://assets.cxreiff.com/github/cube.gif)![foxes](https://assets.cxreiff.com/github/foxes.gif)![sponza test scene](https://assets.cxreiff.com/github/sponza.gif)
+<p float="left">
+<img src="https://assets.cxreiff.com/github/cube.gif" width="30%" alt="cube">
+<img src="https://assets.cxreiff.com/github/foxes.gif" width="30%" alt="foxes">
+<img src="https://assets.cxreiff.com/github/sponza.gif" width="30%" alt="sponza test scene">
+<p>
 
 > examples/cube.rs, bevy many_foxes example, sponza test scene
 
@@ -21,8 +25,16 @@ and receiving terminal events (keyboard, focus, mouse, paste, resize) inside bev
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            // Disable WinitPlugin to avoid a panic in environments without a display server.
+            DefaultPlugins.build().disable::<WinitPlugin>(),
+
+            // Create windowless loop and set its duration per frame (inverse of frame rate).
+            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
+
+            // RatatuiPlugins sets up the Ratatui context and forwards input events.
             RatatuiPlugins::default(),
+
+            // RatatuiRenderPlugin connects a bevy camera target to a ratatui widget.
             RatatuiRenderPlugin::new("main", (256, 256)),
         ))
         .add_systems(Startup, setup_scene_system)
@@ -88,17 +100,6 @@ to `autoresize_conversion_fn`:
 RatatuiRenderPlugin::new("main", (1, 1))
     .autoresize()
     .autoresize_conversion_fn(|(width, height)| (width * 4, height * 3))
-```
-
-To save a few cpu cycles, I also recommend telling bevy explicitly that you don't need a window:
-
-```rust
-DefaultPlugins
-    .set(WindowPlugin {
-        primary_window: None,
-        exit_condition: ExitCondition::DontExit,
-        close_when_requested: false,
-    })
 ```
 
 ## multiple renders
