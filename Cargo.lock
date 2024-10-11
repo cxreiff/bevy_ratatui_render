@@ -876,7 +876,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_ratatui_render"
-version = "0.5.6"
+version = "0.5.7"
 dependencies = [
  "bevy",
  "bevy_ratatui",

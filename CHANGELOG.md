@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.6...v0.5.7) - 2024-10-11
+
+### Other
+
+- shortened comments in docs/README
+- version upgrades
+- update docs and examples to remove WinitPlugin
+
 ## [0.5.6](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.5...v0.5.6) - 2024-08-15
 
 ### Other
