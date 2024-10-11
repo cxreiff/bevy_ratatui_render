@@ -25,16 +25,16 @@ and receiving terminal events (keyboard, focus, mouse, paste, resize) inside bev
 fn main() {
     App::new()
         .add_plugins((
-            // Disable WinitPlugin to avoid a panic in environments without a display server.
+            // disable WinitPlugin as it panics in environments without a display server
             DefaultPlugins.build().disable::<WinitPlugin>(),
 
-            // Create windowless loop and set its duration per frame (inverse of frame rate).
+            // create windowless loop and set its frame rate
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
 
-            // RatatuiPlugins sets up the Ratatui context and forwards input events.
+            // set up the Ratatui context and forward input events
             RatatuiPlugins::default(),
 
-            // RatatuiRenderPlugin connects a bevy camera target to a ratatui widget.
+            // connect a bevy camera target to a ratatui widget
             RatatuiRenderPlugin::new("main", (256, 256)),
         ))
         .add_systems(Startup, setup_scene_system)
