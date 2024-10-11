@@ -26,7 +26,10 @@ fn main() {
     App::new()
         .add_plugins((
             // disable WinitPlugin as it panics in environments without a display server
-            DefaultPlugins.build().disable::<WinitPlugin>(),
+            // disable LogPlugin as it interferes with terminal output.
+            DefaultPlugins.build()
+                .disable::<WinitPlugin>()
+                .disable::<LogPlugin>(),
 
             // create windowless loop and set its frame rate
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),

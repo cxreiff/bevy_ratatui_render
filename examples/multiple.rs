@@ -5,6 +5,7 @@ use bevy::app::AppExit;
 use bevy::app::ScheduleRunnerPlugin;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use bevy::utils::error;
 use bevy::winit::WinitPlugin;
@@ -32,7 +33,8 @@ fn main() {
         .add_plugins((
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
-                .disable::<WinitPlugin>(),
+                .disable::<WinitPlugin>()
+                .disable::<LogPlugin>(),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugins::default(),

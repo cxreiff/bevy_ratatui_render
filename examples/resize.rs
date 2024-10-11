@@ -3,6 +3,7 @@ use std::time::Duration;
 use bevy::app::AppExit;
 use bevy::app::ScheduleRunnerPlugin;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use bevy::winit::WinitPlugin;
 use bevy_ratatui::event::KeyEvent;
@@ -18,7 +19,8 @@ fn main() {
         .add_plugins((
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
-                .disable::<WinitPlugin>(),
+                .disable::<WinitPlugin>()
+                .disable::<LogPlugin>(),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             RatatuiPlugins::default(),
             RatatuiRenderPlugin::new("main", (256, 256))
