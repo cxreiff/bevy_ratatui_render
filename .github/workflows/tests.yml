@@ -9,5 +9,7 @@ on:
 jobs:
   tests:
     uses: cxreiff/github_workflows/.github/workflows/rust_tests.yml@main
+    secrets:
+      DEDICATED_TOKEN: ${{ secrets.DEDICATED_TOKEN }}
     with:
       linux_dependencies: "libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev"
