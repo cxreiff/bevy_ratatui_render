@@ -13,8 +13,8 @@ pub struct RatatuiRenderWidget<'a> {
 
 impl<'a> RatatuiRenderWidget<'a> {
     pub fn new(image: &'a Image) -> Self {
-        let mut picker = Picker::new((1, 2));
-        picker.protocol_type = ProtocolType::Halfblocks;
+        let mut picker = Picker::from_fontsize((1, 2));
+        picker.set_protocol_type(ProtocolType::Halfblocks);
 
         Self { image, picker }
     }
@@ -45,6 +45,6 @@ impl<'a> Widget for RatatuiRenderWidget<'a> {
             .new_protocol(image, render_area, Resize::Fit(None))
             .unwrap();
 
-        ratatui_image::Image::new(img_as_halfblocks.as_ref()).render(render_area, buf);
+        ratatui_image::Image::new(&img_as_halfblocks).render(render_area, buf);
     }
 }
