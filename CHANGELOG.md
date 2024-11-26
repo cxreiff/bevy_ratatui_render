@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.8...v0.5.9) - 2024-11-26
+
+### Added
+
+- ratatui 0.29, ratatui-image 3.0
+
+### Other
+
+- added linux_dependencies to check workflow
+- update secret name in workflows
+
 ## [0.5.8](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.7...v0.5.8) - 2024-10-11
 
 ### Other
