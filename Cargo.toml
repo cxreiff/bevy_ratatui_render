@@ -15,9 +15,9 @@ keywords = ["bevy", "ratatui", "terminal", "tui", "render"]
 bevy = "0.14.2"
 crossterm = "0.28.0"
 crossbeam-channel = "0.5.13"
-ratatui = "0.28.1"
-ratatui-image = "2.0.1"
-bevy_ratatui = "0.6.3"
+ratatui = "0.29.0"
+ratatui-image = "3.0.0"
+bevy_ratatui = "0.6.4"
 
 [profile.dev]
 opt-level = 1
