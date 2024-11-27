@@ -127,7 +127,7 @@ that the following terminals display correctly:
 
 | bevy  | bevy_ratatui_render |
 |-------|---------------------|
-| 0.14  | 0.5                 |
+| 0.14  | 0.6                 |
 | 0.13  | 0.4                 |
 
 ## credits
