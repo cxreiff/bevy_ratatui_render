@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bevy::app::AppExit;
 use bevy::app::ScheduleRunnerPlugin;
-use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
@@ -58,39 +57,31 @@ fn setup_scene_system(
 ) {
     commands.spawn((
         Cube,
-        PbrBundle {
-            mesh: meshes.add(Cuboid::default()),
-            material: materials.add(StandardMaterial {
-                base_color: Color::srgb(0.4, 0.54, 0.7),
-                ..Default::default()
-            }),
-            transform: Transform::default(),
+        Mesh3d(meshes.add(Cuboid::default())),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.4, 0.54, 0.7),
+            ..Default::default()
+        })),
+    ));
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(15., 15., 1.))),
+        Transform::from_xyz(0., 0., -6.),
+    ));
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
             ..Default::default()
         },
+        Transform::from_xyz(3., 4., 6.),
     ));
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(15., 15., 1.)),
-        material: materials.add(StandardMaterial::default()),
-        transform: Transform::from_xyz(0., 0., -6.),
-        ..Default::default()
-    });
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(3., 4., 6.),
-        ..default()
-    });
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
-        tonemapping: Tonemapping::None,
-        camera: Camera {
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
             target: ratatui_render.target("main").unwrap(),
             ..default()
         },
-        ..default()
-    });
+        Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
+    ));
 }
 
 fn draw_scene_system(
@@ -156,23 +147,18 @@ pub fn handle_input_system(
                 KeyCode::Char('q') => {
                     exit.send_default();
                 }
-
                 KeyCode::Char('p') => {
                     panic!("Panic!");
                 }
-
                 KeyCode::Char('d') => {
                     flags.debug = !flags.debug;
                 }
-
                 KeyCode::Left => {
                     *input = InputState::Left(0.75);
                 }
-
                 KeyCode::Right => {
                     *input = InputState::Right(0.75);
                 }
-
                 _ => {}
             },
             KeyEventKind::Release => match key_event.code {
@@ -199,12 +185,12 @@ fn rotate_cube_system(
 ) {
     match *input {
         InputState::Idle => {
-            cube.single_mut().rotate_z(time.delta_seconds());
+            cube.single_mut().rotate_z(time.delta_secs());
         }
         InputState::Left(duration) => {
             cube.single_mut()
-                .rotate_z(-time.delta_seconds() * duration.min(0.25) * 4.);
-            let new_duration = (duration - time.delta_seconds()).max(0.);
+                .rotate_z(-time.delta_secs() * duration.min(0.25) * 4.);
+            let new_duration = (duration - time.delta_secs()).max(0.);
             *input = if new_duration > 0. {
                 InputState::Left(new_duration)
             } else {
@@ -213,8 +199,8 @@ fn rotate_cube_system(
         }
         InputState::Right(duration) => {
             cube.single_mut()
-                .rotate_z(time.delta_seconds() * duration.min(0.25) * 4.);
-            let new_duration = (duration - time.delta_seconds()).max(0.);
+                .rotate_z(time.delta_secs() * duration.min(0.25) * 4.);
+            let new_duration = (duration - time.delta_secs()).max(0.);
             *input = if new_duration > 0. {
                 InputState::Right(new_duration)
             } else {

@@ -9,6 +9,7 @@ use std::sync::{
 };
 
 use bevy::{
+    image::TextureFormatPixelInfo,
     prelude::*,
     render::{
         camera::RenderTarget,
@@ -20,7 +21,7 @@ use bevy::{
             TextureUsages,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
-        texture::{BevyDefault, GpuImage, TextureFormatPixelInfo},
+        texture::GpuImage,
         Extract,
     },
 };

@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use bevy::app::AppExit;
-use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::log::LogPlugin;
 use bevy::winit::WinitPlugin;
 use bevy::{app::ScheduleRunnerPlugin, prelude::*};
@@ -41,39 +40,31 @@ fn setup_scene_system(
 ) {
     commands.spawn((
         Cube,
-        PbrBundle {
-            mesh: meshes.add(Cuboid::default()),
-            material: materials.add(StandardMaterial {
-                base_color: Color::srgb(0.4, 0.54, 0.7),
-                ..Default::default()
-            }),
-            transform: Transform::default(),
+        Mesh3d(meshes.add(Cuboid::default())),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.4, 0.54, 0.7),
+            ..Default::default()
+        })),
+    ));
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(15., 15., 1.))),
+        Transform::from_xyz(0., 0., -6.),
+    ));
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
             ..Default::default()
         },
+        Transform::from_xyz(3., 4., 6.),
     ));
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(15., 15., 1.)),
-        material: materials.add(StandardMaterial::default()),
-        transform: Transform::from_xyz(0., 0., -6.),
-        ..Default::default()
-    });
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(3., 4., 6.),
-        ..default()
-    });
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
-        tonemapping: Tonemapping::None,
-        camera: Camera {
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
             target: ratatui_render.target("main").unwrap(),
             ..default()
         },
-        ..default()
-    });
+        Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
+    ));
 }
 
 pub fn handle_input_system(mut rat_events: EventReader<KeyEvent>, mut exit: EventWriter<AppExit>) {
@@ -87,5 +78,5 @@ pub fn handle_input_system(mut rat_events: EventReader<KeyEvent>, mut exit: Even
 }
 
 fn rotate_cube_system(time: Res<Time>, mut cube: Query<&mut Transform, With<Cube>>) {
-    cube.single_mut().rotate_z(time.delta_seconds());
+    cube.single_mut().rotate_z(time.delta_secs());
 }
