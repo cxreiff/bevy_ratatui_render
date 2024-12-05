@@ -49,17 +49,17 @@ fn setup_scene_system(
     mut commands: Commands,
     ratatui_render: Res<RatatuiRenderContext>,
 ) {
-    // spawn objects into your scene
+    // spawn objects into your scene, and your camera
 
     ...
 
-    commands.spawn(Camera3dBundle {
-        camera: Camera {
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
             target: ratatui_render.target("main").unwrap(),
             ..default()
         },
-        ..default()
-    });
+    ));
 }
 
 fn draw_scene_system(
@@ -127,6 +127,7 @@ that the following terminals display correctly:
 
 | bevy  | bevy_ratatui_render |
 |-------|---------------------|
+| 0.15  | 0.7                 |
 | 0.14  | 0.6                 |
 | 0.13  | 0.4                 |
 

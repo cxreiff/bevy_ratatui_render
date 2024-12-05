@@ -258,7 +258,7 @@ impl RatatuiRenderContext {
     ///
     /// * `world` - Mutable reference to Bevy world.
     pub fn create(id: &str, dimensions: (u32, u32), world: &mut World) {
-        world.run_system_once(initialize_context_system_generator(id.into(), dimensions));
+        let _ = world.run_system_once(initialize_context_system_generator(id.into(), dimensions));
     }
 
     /// Gets a clone of the render target, for placement inside a bevy camera.

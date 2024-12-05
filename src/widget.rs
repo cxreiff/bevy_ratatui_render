@@ -1,4 +1,4 @@
-use bevy::render::texture::Image;
+use bevy::image::Image;
 use ratatui::prelude::*;
 use ratatui::widgets::Widget;
 use ratatui_image::{
@@ -20,7 +20,7 @@ impl<'a> RatatuiRenderWidget<'a> {
     }
 }
 
-impl<'a> Widget for RatatuiRenderWidget<'a> {
+impl Widget for RatatuiRenderWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let Self { image, mut picker } = self;
 

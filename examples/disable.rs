@@ -1,7 +1,6 @@
 use std::io;
 
 use bevy::app::AppExit;
-use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::ButtonState;
@@ -40,15 +39,14 @@ fn main() {
 
 // Use `unwrap_or_default` so the camera falls back to a normal window target.
 fn setup_camera_system(mut commands: Commands, ratatui_render: Res<RatatuiRenderContext>) {
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
-        tonemapping: Tonemapping::None,
-        camera: Camera {
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
             target: ratatui_render.target("main").unwrap_or_default(),
             ..default()
         },
-        ..default()
-    });
+        Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
+    ));
 }
 
 // Wrap `frame.render_widget` in an if-let for when `widget(id)` returns `None`.
@@ -98,24 +96,19 @@ fn setup_scene_system(
 ) {
     commands.spawn((
         Cube,
-        PbrBundle {
-            mesh: meshes.add(Cuboid::default()),
-            material: materials.add(StandardMaterial {
-                base_color: Color::srgb(0.4, 0.54, 0.7),
-                ..Default::default()
-            }),
-            transform: Transform::default(),
+        Mesh3d(meshes.add(Cuboid::default())),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.4, 0.54, 0.7),
+            ..default()
+        })),
+    ));
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
             ..Default::default()
         },
+        Transform::from_xyz(3., 4., 6.),
     ));
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(3., 4., 6.),
-        ..default()
-    });
 }
 
 pub fn handle_input_system(
@@ -130,15 +123,12 @@ pub fn handle_input_system(
                 KeyCode::Char('q') => {
                     exit.send_default();
                 }
-
                 KeyCode::Left => {
-                    cube.single_mut().rotate_z(-10. * time.delta_seconds());
+                    cube.single_mut().rotate_z(-10. * time.delta_secs());
                 }
-
                 KeyCode::Right => {
-                    cube.single_mut().rotate_z(10. * time.delta_seconds());
+                    cube.single_mut().rotate_z(10. * time.delta_secs());
                 }
-
                 _ => {}
             },
             _ => {}
