@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.6.0...v0.7.0) - 2024-12-05
+
+### Added
+
+- [**breaking**] bevy 0.15 migration
+
+### Other
+
+- Bump ruzstd from 0.7.0 to 0.7.3 in the cargo group across 1 directory
+- updated README for version bump
+
 ## [0.5.8](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.7...v0.5.8) - 2024-10-11
 
 ### Other
