@@ -1,50 +1,57 @@
 use bevy::image::Image;
-use ratatui::prelude::*;
 use ratatui::widgets::Widget;
-use ratatui_image::{
-    picker::{Picker, ProtocolType},
-    FilterType, Resize,
-};
+use ratatui::{prelude::*, widgets::WidgetRef};
 
-pub struct RatatuiRenderWidget<'a> {
+use crate::{RatatuiRenderStrategy, RatatuiRenderWidgetHalfblocks, RatatuiRenderWidgetLuminance};
+
+pub struct RatatuiRenderWidget<'a, 'b, 'c> {
     image: &'a Image,
-    picker: Picker,
+    sobel: &'b Option<Image>,
+    strategy: &'c RatatuiRenderStrategy,
 }
 
-impl<'a> RatatuiRenderWidget<'a> {
-    pub fn new(image: &'a Image) -> Self {
-        let mut picker = Picker::from_fontsize((1, 2));
-        picker.set_protocol_type(ProtocolType::Halfblocks);
-
-        Self { image, picker }
+impl<'a, 'b, 'c> RatatuiRenderWidget<'a, 'b, 'c> {
+    pub fn new(
+        image: &'a Image,
+        sobel: &'b Option<Image>,
+        strategy: &'c RatatuiRenderStrategy,
+    ) -> Self {
+        Self {
+            image,
+            sobel,
+            strategy,
+        }
     }
 }
 
-impl Widget for RatatuiRenderWidget<'_> {
+impl Widget for RatatuiRenderWidget<'_, '_, '_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let Self { image, mut picker } = self;
+        let Self {
+            image,
+            sobel,
+            strategy,
+        } = self;
 
         let image = match image.clone().try_into_dynamic() {
             Ok(image) => image,
             Err(e) => panic!("failed to create image buffer {e:?}"),
         };
 
-        let image = image.resize(
-            area.width as u32,
-            area.height as u32 * 2,
-            FilterType::Nearest,
-        );
+        let sobel = sobel
+            .as_ref()
+            .map(|sobel| match sobel.clone().try_into_dynamic() {
+                Ok(sobel) => sobel,
+                Err(e) => panic!("failed to create sobel buffer {e:?}"),
+            });
 
-        let render_area = Rect {
-            x: area.x + area.width.saturating_sub(image.width() as u16) / 2,
-            y: area.y + (area.height * 2).saturating_sub(image.height() as u16) / 4,
-            ..area
-        };
-
-        let img_as_halfblocks = picker
-            .new_protocol(image, render_area, Resize::Fit(None))
-            .unwrap();
-
-        ratatui_image::Image::new(&img_as_halfblocks).render(render_area, buf);
+        match strategy {
+            RatatuiRenderStrategy::Halfblocks => {
+                RatatuiRenderWidgetHalfblocks::new(image).render_ref(area, buf)
+            }
+            RatatuiRenderStrategy::Luminance(luminance_config) => {
+                RatatuiRenderWidgetLuminance::new(image, sobel, luminance_config.clone())
+                    .render_ref(area, buf);
+            }
+        }
     }
 }

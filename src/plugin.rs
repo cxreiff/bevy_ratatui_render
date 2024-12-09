@@ -10,13 +10,14 @@ use bevy::{
     utils::{error, hashbrown::HashMap},
 };
 use bevy_ratatui::{event::ResizeEvent, terminal::RatatuiContext};
+use ratatui::widgets::Widget;
 
 use crate::{
     headless::{
         image_copier_extract_system, receive_rendered_images_system, send_rendered_image_system,
         HeadlessRenderPipe, ImageCopier, ImageCopy, ImageCopyNode,
     },
-    RatatuiRenderWidget,
+    LuminanceConfig, RatatuiRenderWidget,
 };
 
 /// Function that converts terminal dimensions to render texture dimensions.
@@ -85,10 +86,17 @@ pub type AutoresizeConversionFn = fn((u32, u32)) -> (u32, u32);
 pub struct RatatuiRenderPlugin {
     id: String,
     dimensions: (u32, u32),
+    strategy: RatatuiRenderStrategy,
     print_full_terminal: bool,
     autoresize: bool,
     autoresize_conversion_fn: Option<AutoresizeConversionFn>,
     disabled: bool,
+}
+
+#[derive(Clone)]
+pub enum RatatuiRenderStrategy {
+    Halfblocks,
+    Luminance(LuminanceConfig),
 }
 
 impl RatatuiRenderPlugin {
@@ -98,16 +106,96 @@ impl RatatuiRenderPlugin {
     ///   created by this instance of the plugin, pass the same string into the `target(id)` and
     ///   `widget(id)` methods on the `RatatuiRenderContext` resource.
     ///
-    /// * `dimensions` - (width, height) - the dimensions of the texture that will be rendered to.
+    /// * `dimensions` - (width, height) - The dimensions of the texture that will be rendered to.
     pub fn new(id: &str, dimensions: (u32, u32)) -> Self {
         Self {
             id: id.into(),
             dimensions,
+            strategy: RatatuiRenderStrategy::Halfblocks,
             print_full_terminal: false,
             autoresize: false,
             autoresize_conversion_fn: None,
             disabled: false,
         }
+    }
+
+    /// Choose the strategy used for printing the rendered scene to the terminal buffer.
+    ///
+    /// Options:
+    ///
+    /// # Halfblocks (default)
+    ///
+    /// Print to the terminal using unicode halfblock characters. By using both the halfblock
+    /// (foreground) color and the background color, we can draw two pixels per buffer cell.
+    ///
+    /// # Luminance
+    ///
+    /// Using a range of unicode characters sorted in increasing order of opacity, select
+    /// a character from the range for each pixel based on that pixel's luminance.
+    ///
+    /// For example, an '@' symbol is more "opaque" than a '+' symbol because it takes up more
+    /// space in the cell it is printed in, and so when printed in bright text on a dark
+    /// background, it appears to be "brighter". In the default set of characters (' .:+!*?#%&@'),
+    /// empty space and periods are used for dimmer areas, and '&' and '@' symbols are used for
+    /// brighter areas.
+    ///
+    /// Because most scenes do not occupy the full range of luminance between 0.0 and 1.0, each
+    /// luminance value is multiplied by a scaling value first. The default value is 10.0, but you
+    /// may need to adjust this value for your needs.
+    ///
+    /// Attributes:
+    ///
+    /// - `luminance_characters`: The list of characters, in increasing order of opacity, to use
+    ///     for printing.
+    ///
+    /// - `luminance_scale`: The number that each luminance value is multiplied by before being
+    ///     used to select a character.
+    ///
+    /// - `edge_detection`: If true, an edge-detection step will be added in the render pipeline
+    ///     using a Sobel filter, and special directional edge characters will be used when edges
+    ///     are detected. For example, if a hard vertical line is detected, a vertical pipe ('|')
+    ///     character will be used instead of the selected-by-luminance character.
+    ///
+    /// Examples:
+    ///
+    /// The following would configure the plugin to use the Luminance strategy with the default
+    /// configuration:
+    ///
+    /// ```no_run
+    /// # use bevy::prelude::*;
+    /// # use bevy_ratatui::RatatuiPlugins;
+    /// # use bevy_ratatui_render::{RatatuiRenderPlugin, RatatuiRenderStrategy, LuminanceConfig};
+    /// #
+    /// RatatuiRenderPlugin::new("main", (0, 0))
+    ///     .strategy(RatatuiRenderStrategy::Luminance(LuminanceConfig::default()));
+    /// ```
+    ///
+    /// The following would configure the plugin to use ' ' and '.' for dimmer areas,
+    /// use '+' and '#' for brighter areas, multiply each luminance value by 5, and to apply edge
+    /// detection:
+    ///
+    /// ```no_run
+    /// # use bevy::prelude::*;
+    /// # use bevy_ratatui::RatatuiPlugins;
+    /// # use bevy_ratatui_render::{RatatuiRenderPlugin, RatatuiRenderStrategy, LuminanceConfig};
+    /// #
+    /// RatatuiRenderPlugin::new("main", (0, 0))
+    ///     .strategy(RatatuiRenderStrategy::Luminance(
+    ///         LuminanceConfig {
+    ///             luminance_characters: vec![' ', '.', '+', '#'],
+    ///             luminance_scale: 5.0,
+    ///             edge_detection: true,
+    ///         },
+    ///     ));
+    /// ```
+    ///
+    /// A couple of luminance character sets are included, the default
+    /// (`RatatuiRenderWidgetLuminance::LUMINANCE_CHARACTERS_DEFAULT`) as well as a braille
+    /// alternative (`RatatuiRenderWidgetLuminance::LUMINANCE_CHARACTERS_BRAILLE`).
+    ///
+    pub fn strategy(mut self, strategy: RatatuiRenderStrategy) -> Self {
+        self.strategy = strategy;
+        self
     }
 
     /// Initializes RatatuiRenderContext resource but skips setting up the headless rendering.
@@ -206,7 +294,11 @@ impl Plugin for RatatuiRenderPlugin {
 
         app.add_systems(
             PreStartup,
-            initialize_context_system_generator(self.id.clone(), self.dimensions),
+            initialize_context_system_generator(
+                self.id.clone(),
+                self.dimensions,
+                self.strategy.clone(),
+            ),
         );
 
         if self.print_full_terminal {
@@ -221,13 +313,21 @@ impl Plugin for RatatuiRenderPlugin {
                 PostStartup,
                 (
                     initial_resize_system,
-                    autoresize_system_generator(self.id.clone(), self.autoresize_conversion_fn),
+                    autoresize_system_generator(
+                        self.id.clone(),
+                        self.strategy.clone(),
+                        self.autoresize_conversion_fn,
+                    ),
                 )
                     .chain(),
             )
             .add_systems(
                 PostUpdate,
-                autoresize_system_generator(self.id.clone(), self.autoresize_conversion_fn),
+                autoresize_system_generator(
+                    self.id.clone(),
+                    self.strategy.clone(),
+                    self.autoresize_conversion_fn,
+                ),
             );
         }
     }
@@ -257,8 +357,17 @@ impl RatatuiRenderContext {
     /// * `dimensions` - New dimensions for the render image (`(width: u32, height: u32)`).
     ///
     /// * `world` - Mutable reference to Bevy world.
-    pub fn create(id: &str, dimensions: (u32, u32), world: &mut World) {
-        let _ = world.run_system_once(initialize_context_system_generator(id.into(), dimensions));
+    pub fn create(
+        id: &str,
+        dimensions: (u32, u32),
+        strategy: RatatuiRenderStrategy,
+        world: &mut World,
+    ) {
+        let _ = world.run_system_once(initialize_context_system_generator(
+            id.into(),
+            dimensions,
+            strategy,
+        ));
     }
 
     /// Gets a clone of the render target, for placement inside a bevy camera.
@@ -280,13 +389,15 @@ impl RatatuiRenderContext {
     }
 
     /// Gets a ratatui widget, that when drawn will print the most recent image rendered to the
-    /// render target of the same id.
+    /// render target of the same id, using the strategy configured in the plugin.
     ///
     /// * `id` - Unique descriptive identifier, must match the id provided when the corresponding
     ///   `RatatuiRenderPlugin` was instantiated.
     pub fn widget(&self, id: &str) -> Option<RatatuiRenderWidget> {
         let pipe = self.get(id)?;
-        Some(RatatuiRenderWidget::new(&pipe.image))
+        let widget = RatatuiRenderWidget::new(&pipe.image, &pipe.sobel, &pipe.strategy);
+
+        Some(widget)
     }
 }
 
@@ -294,6 +405,7 @@ impl RatatuiRenderContext {
 fn initialize_context_system_generator(
     id: String,
     dimensions: (u32, u32),
+    strategy: RatatuiRenderStrategy,
 ) -> impl FnMut(
     Commands,
     ResMut<Assets<Image>>,
@@ -302,8 +414,13 @@ fn initialize_context_system_generator(
     EventWriter<ReplacedRenderPipeEvent>,
 ) {
     move |mut commands, mut images, render_device, mut context, mut replaced_pipe| {
-        let new_pipe =
-            HeadlessRenderPipe::new(&mut commands, &mut images, &render_device, dimensions);
+        let new_pipe = HeadlessRenderPipe::new(
+            &mut commands,
+            &mut images,
+            &render_device,
+            dimensions,
+            strategy.clone(),
+        );
         let new_pipe_target = new_pipe.target.clone();
         let maybe_old_pipe = context.insert(id.clone(), new_pipe);
 
@@ -323,7 +440,7 @@ fn print_full_terminal_system(
     move |mut ratatui, ratatui_render| {
         if let Some(render_widget) = ratatui_render.widget(&id) {
             ratatui.draw(|frame| {
-                frame.render_widget(render_widget, frame.area());
+                render_widget.render(frame.area(), frame.buffer_mut());
             })?;
         }
 
@@ -344,6 +461,7 @@ fn initial_resize_system(
 /// Autoresizes the render texture to fit the terminal dimensions.
 fn autoresize_system_generator(
     id: String,
+    strategy: RatatuiRenderStrategy,
     conversion_fn: Option<AutoresizeConversionFn>,
 ) -> impl FnMut(&mut World) {
     move |world| {
@@ -354,7 +472,7 @@ fn autoresize_system_generator(
             let terminal_dimensions = (dimensions.width as u32, dimensions.height as u32 * 2);
             let conversion_fn = conversion_fn.unwrap_or(|(width, height)| (width * 2, height * 2));
             let new_dimensions = conversion_fn(terminal_dimensions);
-            RatatuiRenderContext::create(&id, new_dimensions, world);
+            RatatuiRenderContext::create(&id, new_dimensions, strategy.clone(), world);
         }
     }
 }

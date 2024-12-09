@@ -27,7 +27,7 @@ use bevy::{
 };
 use crossbeam_channel::{Receiver, Sender};
 
-use crate::RatatuiRenderContext;
+use crate::{RatatuiRenderContext, RatatuiRenderStrategy};
 
 #[derive(Clone, Default, Resource, Deref, DerefMut)]
 pub struct ImageCopiers(pub Vec<ImageCopier>);
@@ -73,6 +73,8 @@ pub struct HeadlessRenderPipe {
     receiver: Receiver<Vec<u8>>,
     pub target: RenderTarget,
     pub image: Image,
+    pub sobel: Option<Image>,
+    pub strategy: RatatuiRenderStrategy,
 }
 
 impl HeadlessRenderPipe {
@@ -81,6 +83,7 @@ impl HeadlessRenderPipe {
         images: &mut Assets<Image>,
         render_device: &RenderDevice,
         dimensions: (u32, u32),
+        strategy: RatatuiRenderStrategy,
     ) -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded();
 
@@ -99,6 +102,8 @@ impl HeadlessRenderPipe {
             receiver,
             target: RenderTarget::Image(render_handle),
             image: cpu_texture,
+            sobel: None, // TODO: generate sobel texture during render pipeline.
+            strategy,
         }
     }
 }
