@@ -1,11 +1,16 @@
 use std::io;
 
 use bevy::{
+    core_pipeline::core_3d::graph::{Core3d, Node3d},
     ecs::system::{RunSystemOnce, SystemState},
     prelude::*,
     render::{
-        camera::RenderTarget, render_graph::RenderGraph, renderer::RenderDevice, Render, RenderApp,
-        RenderSet,
+        camera::RenderTarget,
+        extract_component::ExtractComponentPlugin,
+        graph::CameraDriverLabel,
+        render_graph::{RenderGraph, RenderGraphApp, ViewNodeRunner},
+        renderer::RenderDevice,
+        Render, RenderApp, RenderSet,
     },
     utils::{error, hashbrown::HashMap},
 };
@@ -13,10 +18,12 @@ use bevy_ratatui::{event::ResizeEvent, terminal::RatatuiContext};
 use ratatui::widgets::Widget;
 
 use crate::{
+    assets,
     headless::{
-        image_copier_extract_system, receive_rendered_images_system, send_rendered_image_system,
+        receive_rendered_images_system, receive_sobel_images_system, send_rendered_image_system,
         HeadlessRenderPipe, ImageCopier, ImageCopy, ImageCopyNode,
     },
+    sobel::ImageCopierSobel,
     LuminanceConfig, RatatuiRenderWidget,
 };
 
@@ -276,20 +283,27 @@ impl Plugin for RatatuiRenderPlugin {
             .get_resource_mut::<RatatuiRenderContext>()
             .is_none()
         {
+            app.add_plugins(assets::plugin);
+
+            app.add_plugins((
+                ExtractComponentPlugin::<ImageCopier>::default(),
+                ExtractComponentPlugin::<ImageCopierSobel>::default(),
+            ));
+
             app.init_resource::<RatatuiRenderContext>()
-                .add_systems(First, receive_rendered_images_system)
+                .add_systems(
+                    First,
+                    (receive_rendered_images_system, receive_sobel_images_system),
+                )
                 .add_systems(PostUpdate, replaced_pipe_cleanup_system)
                 .add_event::<ReplacedRenderPipeEvent>();
 
             let render_app = app.sub_app_mut(RenderApp);
 
-            let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
-            graph.add_node(ImageCopy, ImageCopyNode);
-            graph.add_node_edge(bevy::render::graph::CameraDriverLabel, ImageCopy);
+            render_app.add_render_graph_node::<ViewNodeRunner<ImageCopyNode>>(Core3d, ImageCopy);
+            render_app.add_render_graph_edge(Core3d, Node3d::EndMainPassPostProcessing, ImageCopy);
 
-            render_app
-                .add_systems(ExtractSchedule, image_copier_extract_system)
-                .add_systems(Render, send_rendered_image_system.after(RenderSet::Render));
+            render_app.add_systems(Render, send_rendered_image_system.after(RenderSet::Render));
         }
 
         app.add_systems(
@@ -395,7 +409,7 @@ impl RatatuiRenderContext {
     ///   `RatatuiRenderPlugin` was instantiated.
     pub fn widget(&self, id: &str) -> Option<RatatuiRenderWidget> {
         let pipe = self.get(id)?;
-        let widget = RatatuiRenderWidget::new(&pipe.image, &pipe.sobel, &pipe.strategy);
+        let widget = RatatuiRenderWidget::new(&pipe.image, &pipe.image_sobel, &pipe.strategy);
 
         Some(widget)
     }
@@ -513,11 +527,11 @@ fn replaced_pipe_cleanup_system(
 
             if let Some((entity, image_copier)) = image_copier_query
                 .iter_mut()
-                .find(|(_, image_copier)| image_copier.src_image == *old_target_image)
+                .find(|(_, image_copier)| image_copier.image == *old_target_image)
             {
                 commands.entity(entity).despawn();
 
-                images.remove(&image_copier.src_image.clone());
+                images.remove(&image_copier.image.clone());
             }
         };
     }

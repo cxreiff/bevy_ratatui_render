@@ -1,5 +1,7 @@
+mod assets;
 mod headless;
 mod plugin;
+mod sobel;
 mod widget;
 mod widget_halfblocks;
 mod widget_luminance;

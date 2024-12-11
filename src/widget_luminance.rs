@@ -6,15 +6,19 @@ use ratatui::widgets::WidgetRef;
 
 pub struct RatatuiRenderWidgetLuminance {
     image: DynamicImage,
-    sobel: Option<DynamicImage>,
+    image_sobel: Option<DynamicImage>,
     config: LuminanceConfig,
 }
 
 impl RatatuiRenderWidgetLuminance {
-    pub fn new(image: DynamicImage, sobel: Option<DynamicImage>, config: LuminanceConfig) -> Self {
+    pub fn new(
+        image: DynamicImage,
+        image_sobel: Option<DynamicImage>,
+        config: LuminanceConfig,
+    ) -> Self {
         Self {
             image,
-            sobel,
+            image_sobel,
             config,
         }
     }
@@ -24,7 +28,7 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let Self {
             image,
-            sobel,
+            image_sobel,
             config,
         } = self;
 
@@ -47,7 +51,7 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             config.luminance_scale,
         );
 
-        if let Some(_sobel) = sobel {
+        if let Some(_image_sobel) = image_sobel {
             // TODO: handle replacing characters with line characters based on sobel filter.
         }
 

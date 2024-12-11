@@ -41,7 +41,10 @@ fn main() {
             RatatuiPlugins::default(),
             RatatuiRenderPlugin::new("main", (256, 256))
                 .autoresize()
-                .strategy(RatatuiRenderStrategy::Luminance(LuminanceConfig::default())),
+                .strategy(RatatuiRenderStrategy::Luminance(LuminanceConfig {
+                    edge_detection: true,
+                    ..Default::default()
+                })),
         ))
         .insert_resource(Flags::default())
         .insert_resource(ClearColor(Color::BLACK))
