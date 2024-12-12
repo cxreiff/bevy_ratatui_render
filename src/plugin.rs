@@ -1,29 +1,18 @@
 use std::io;
 
 use bevy::{
-    core_pipeline::core_3d::graph::{Core3d, Node3d},
     ecs::system::{RunSystemOnce, SystemState},
     prelude::*,
-    render::{
-        camera::RenderTarget,
-        extract_component::ExtractComponentPlugin,
-        graph::CameraDriverLabel,
-        render_graph::{RenderGraph, RenderGraphApp, ViewNodeRunner},
-        renderer::RenderDevice,
-        Render, RenderApp, RenderSet,
-    },
+    render::{camera::RenderTarget, renderer::RenderDevice},
     utils::{error, hashbrown::HashMap},
 };
 use bevy_ratatui::{event::ResizeEvent, terminal::RatatuiContext};
 use ratatui::widgets::Widget;
 
 use crate::{
-    assets,
-    headless::{
-        receive_rendered_images_system, receive_sobel_images_system, send_rendered_image_system,
-        HeadlessRenderPipe, ImageCopier, ImageCopy, ImageCopyNode,
-    },
-    sobel::ImageCopierSobel,
+    headless_node_sobel,
+    headless_plugin::{self, ReplacedRenderPipeEvent},
+    headless_render_pipe::HeadlessRenderPipe,
     LuminanceConfig, RatatuiRenderWidget,
 };
 
@@ -273,37 +262,23 @@ impl RatatuiRenderPlugin {
 
 impl Plugin for RatatuiRenderPlugin {
     fn build(&self, app: &mut App) {
+        let initialized = app.is_plugin_added::<Self>();
+
         if self.disabled {
-            app.init_resource::<RatatuiRenderContext>();
+            if !initialized {
+                app.init_resource::<RatatuiRenderContext>();
+            }
             return;
         }
 
-        if app
-            .world_mut()
-            .get_resource_mut::<RatatuiRenderContext>()
-            .is_none()
-        {
-            app.add_plugins(assets::plugin);
+        if !initialized {
+            app.add_plugins(headless_plugin::plugin);
+        }
 
-            app.add_plugins((
-                ExtractComponentPlugin::<ImageCopier>::default(),
-                ExtractComponentPlugin::<ImageCopierSobel>::default(),
-            ));
-
-            app.init_resource::<RatatuiRenderContext>()
-                .add_systems(
-                    First,
-                    (receive_rendered_images_system, receive_sobel_images_system),
-                )
-                .add_systems(PostUpdate, replaced_pipe_cleanup_system)
-                .add_event::<ReplacedRenderPipeEvent>();
-
-            let render_app = app.sub_app_mut(RenderApp);
-
-            render_app.add_render_graph_node::<ViewNodeRunner<ImageCopyNode>>(Core3d, ImageCopy);
-            render_app.add_render_graph_edge(Core3d, Node3d::EndMainPassPostProcessing, ImageCopy);
-
-            render_app.add_systems(Render, send_rendered_image_system.after(RenderSet::Render));
+        if let RatatuiRenderStrategy::Luminance(_) = self.strategy {
+            if !app.is_plugin_added::<headless_node_sobel::HeadlessNodeSobelPlugin>() {
+                app.add_plugins(headless_node_sobel::HeadlessNodeSobelPlugin);
+            }
         }
 
         app.add_systems(
@@ -488,51 +463,5 @@ fn autoresize_system_generator(
             let new_dimensions = conversion_fn(terminal_dimensions);
             RatatuiRenderContext::create(&id, new_dimensions, strategy.clone(), world);
         }
-    }
-}
-
-#[derive(Event)]
-pub struct ReplacedRenderPipeEvent {
-    old_render_target: RenderTarget,
-    new_render_target: RenderTarget,
-}
-
-/// When a new render pipe is created with an existing name, the old pipe is replaced.
-/// This system cleans up assets and components from the old pipe.
-fn replaced_pipe_cleanup_system(
-    mut commands: Commands,
-    mut replaced_pipe: EventReader<ReplacedRenderPipeEvent>,
-    mut images: ResMut<Assets<Image>>,
-    mut camera_query: Query<&mut Camera>,
-    mut image_copier_query: Query<(Entity, &mut ImageCopier)>,
-) {
-    for ReplacedRenderPipeEvent {
-        old_render_target,
-        new_render_target,
-    } in replaced_pipe.read()
-    {
-        if let Some(old_target_image) = old_render_target.as_image() {
-            if let Some(mut camera) = camera_query.iter_mut().find(|camera| {
-                if let Some(camera_image) = camera.target.as_image() {
-                    return camera_image == old_target_image;
-                }
-
-                false
-            }) {
-                camera.target = new_render_target.clone();
-                if let Some(image_handle) = old_render_target.as_image() {
-                    images.remove(image_handle);
-                }
-            }
-
-            if let Some((entity, image_copier)) = image_copier_query
-                .iter_mut()
-                .find(|(_, image_copier)| image_copier.image == *old_target_image)
-            {
-                commands.entity(entity).despawn();
-
-                images.remove(&image_copier.image.clone());
-            }
-        };
     }
 }

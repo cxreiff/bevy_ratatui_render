@@ -1,7 +1,8 @@
-mod assets;
-mod headless;
+mod headless_node;
+mod headless_node_sobel;
+mod headless_plugin;
+mod headless_render_pipe;
 mod plugin;
-mod sobel;
 mod widget;
 mod widget_halfblocks;
 mod widget_luminance;
