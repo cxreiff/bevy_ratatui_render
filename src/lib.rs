@@ -3,6 +3,7 @@ mod headless_node_sobel;
 mod headless_plugin;
 mod headless_render_pipe;
 mod plugin;
+mod ratatui_camera;
 mod widget;
 mod widget_halfblocks;
 mod widget_luminance;
