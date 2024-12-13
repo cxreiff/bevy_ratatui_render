@@ -275,11 +275,12 @@ impl Plugin for RatatuiRenderPlugin {
             app.add_plugins(headless_plugin::plugin);
         }
 
-        if let RatatuiRenderStrategy::Luminance(_) = self.strategy {
-            if !app.is_plugin_added::<headless_node_sobel::HeadlessNodeSobelPlugin>() {
-                app.add_plugins(headless_node_sobel::HeadlessNodeSobelPlugin);
-            }
-        }
+        // TODO: RE-ENABLE
+        // if let RatatuiRenderStrategy::Luminance(_) = self.strategy {
+        //     if !app.is_plugin_added::<headless_node_sobel::HeadlessNodeSobelPlugin>() {
+        //         app.add_plugins(headless_node_sobel::HeadlessNodeSobelPlugin);
+        //     }
+        // }
 
         app.add_systems(
             PreStartup,
