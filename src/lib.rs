@@ -1,20 +1,14 @@
-mod headless_node;
-mod headless_node_sobel;
-mod headless_plugin;
-mod headless_render_pipe;
-mod image_pipe;
-mod plugin;
-mod ratatui_camera;
-mod ratatui_camera_node;
-mod ratatui_camera_readback;
-mod ratatui_sobel_node;
+mod camera;
+mod camera_image_pipe;
+mod camera_node;
+mod camera_node_sobel;
+mod camera_readback;
 mod widget;
 mod widget_halfblocks;
 mod widget_luminance;
 
-pub use plugin::{
-    AutoresizeConversionFn, RatatuiRenderContext, RatatuiRenderPlugin, RatatuiRenderStrategy,
-};
-pub use widget::RatatuiRenderWidget;
+pub use camera::{RatatuiCamera, RatatuiCameraPlugin, RatatuiCameraStrategy};
+
+pub use widget::RatatuiCameraWidget;
 pub use widget_halfblocks::RatatuiRenderWidgetHalfblocks;
 pub use widget_luminance::{LuminanceConfig, RatatuiRenderWidgetLuminance};

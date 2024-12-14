@@ -32,11 +32,20 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             config,
         } = self;
 
-        let image = image.resize(
+        let mut image = image.resize(
             area.width as u32,
             area.height as u32 * 2,
             FilterType::Nearest,
         );
+
+        if let Some(image_sobel) = image_sobel {
+            image = image_sobel.resize(
+                area.width as u32,
+                area.height as u32 * 2,
+                FilterType::Nearest,
+            );
+            // TODO: handle replacing characters with line characters based on sobel filter.
+        }
 
         let render_area = Rect {
             x: area.x + area.width.saturating_sub(image.width() as u16) / 2,
