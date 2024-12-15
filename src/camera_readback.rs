@@ -55,6 +55,8 @@ fn spawn_ratatui_camera_machinery_system(
     for (entity_id, mut camera, ratatui_camera) in &mut ratatui_cameras {
         let mut entity = commands.entity(entity_id);
 
+        entity.insert(Msaa::Off);
+
         let (sender, receiver) =
             create_image_pipe(&mut images, &render_device, ratatui_camera.dimensions);
 

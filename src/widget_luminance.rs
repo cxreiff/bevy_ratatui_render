@@ -32,20 +32,25 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             config,
         } = self;
 
-        let mut image = image.resize(
+        let Some(image_sobel) = image_sobel else {
+            println!("NO IMAGE_SOBEL");
+            return;
+        };
+
+        let image = image_sobel.resize(
             area.width as u32,
             area.height as u32 * 2,
             FilterType::Nearest,
         );
 
-        if let Some(image_sobel) = image_sobel {
-            image = image_sobel.resize(
-                area.width as u32,
-                area.height as u32 * 2,
-                FilterType::Nearest,
-            );
-            // TODO: handle replacing characters with line characters based on sobel filter.
-        }
+        // if let Some(image_sobel) = image_sobel {
+        //     image = image_sobel.resize(
+        //         area.width as u32,
+        //         area.height as u32 * 2,
+        //         FilterType::Nearest,
+        //     );
+        //     // TODO: handle replacing characters with line characters based on sobel filter.
+        // }
 
         let render_area = Rect {
             x: area.x + area.width.saturating_sub(image.width() as u16) / 2,
@@ -60,9 +65,9 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             config.luminance_scale,
         );
 
-        if let Some(_image_sobel) = image_sobel {
-            // TODO: handle replacing characters with line characters based on sobel filter.
-        }
+        // if let Some(_image_sobel) = image_sobel {
+        //     // TODO: handle replacing characters with line characters based on sobel filter.
+        // }
 
         for (index, (character, color)) in color_characters.iter().enumerate() {
             let x = index as u16 % image.width() as u16;
@@ -129,9 +134,12 @@ fn convert_image_to_rgb_triplets(image: &DynamicImage) -> Vec<[u8; 3]> {
             if y % 2 == 0 {
                 rgb_triplets[position] = pixel.0;
             } else {
-                rgb_triplets[position][0] = (rgb_triplets[position][0] + pixel[0]) / 2;
-                rgb_triplets[position][1] = (rgb_triplets[position][1] + pixel[1]) / 2;
-                rgb_triplets[position][2] = (rgb_triplets[position][2] + pixel[2]) / 2;
+                rgb_triplets[position][0] =
+                    (rgb_triplets[position][0].saturating_add(pixel[0])) / 2;
+                rgb_triplets[position][1] =
+                    (rgb_triplets[position][1].saturating_add(pixel[1])) / 2;
+                rgb_triplets[position][2] =
+                    (rgb_triplets[position][2].saturating_add(pixel[2])) / 2;
             }
         }
     }

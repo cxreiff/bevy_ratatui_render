@@ -19,9 +19,9 @@ use bevy::{
             binding_types::{
                 sampler, texture_2d, texture_depth_2d, uniform_buffer, uniform_buffer_sized,
             },
-            BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId,
-            ColorTargetState, ColorWrites, FragmentState, MultisampleState, Operations,
-            PipelineCache, PipelineDescriptor, PrimitiveState, RenderPassColorAttachment,
+            BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedPipelineState,
+            CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState,
+            Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment,
             RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType,
             SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType,
             UniformBuffer,
@@ -94,9 +94,11 @@ impl ViewNode for RatatuiCameraNodeSobel {
         let sobel_pipeline = world.resource::<RatatuiCameraNodeSobelPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
 
-        // let state = pipeline_cache.get_render_pipeline_state(sobel_pipeline.pipeline_id);
-        // println!("{state:?}");
-        // std::thread::sleep(std::time::Duration::from_secs(10));
+        if let CachedPipelineState::Err(pipeline_error) =
+            pipeline_cache.get_render_pipeline_state(sobel_pipeline.pipeline_id)
+        {
+            log::error!("{pipeline_error:?}");
+        };
 
         let Some(pipeline) = pipeline_cache.get_render_pipeline(sobel_pipeline.pipeline_id) else {
             return Ok(());
@@ -105,15 +107,18 @@ impl ViewNode for RatatuiCameraNodeSobel {
         let source = view_target.main_texture_view();
         let destination = gpu_images.get(&sobel_sender.sender_image).unwrap();
         let view_uniforms = world.resource::<ViewUniforms>();
+
+        // TODO: pull this data from the LuminanceConfig.
         let config_buffer = world.resource::<RatatuiCameraNodeSobelConfigBuffer>();
 
-        let Some(view_uniforms) = view_uniforms.uniforms.binding() else {
+        let (Some(depth_prepass), Some(normal_prepass)) = (
+            view_prepass_textures.depth_view(),
+            view_prepass_textures.normal_view(),
+        ) else {
             return Ok(());
         };
 
-        let (Some(depth_texture), Some(normal_texture)) =
-            (&view_prepass_textures.depth, &view_prepass_textures.normal)
-        else {
+        let Some(view_uniforms) = view_uniforms.uniforms.binding() else {
             return Ok(());
         };
 
@@ -123,8 +128,8 @@ impl ViewNode for RatatuiCameraNodeSobel {
             &BindGroupEntries::sequential((
                 source,
                 &sobel_pipeline.sampler,
-                // &depth_texture.texture.default_view,
-                &normal_texture.texture.default_view,
+                depth_prepass,
+                normal_prepass,
                 view_uniforms,
                 &config_buffer.buffer,
             )),
@@ -158,9 +163,9 @@ pub struct RatatuiCameraNodeSobelConfig {
 impl Default for RatatuiCameraNodeSobelConfig {
     fn default() -> Self {
         Self {
-            depth_threshold: 0.2,
-            normal_threshold: 0.05,
-            color_threshold: 1.0,
+            depth_threshold: 0.01,
+            normal_threshold: 0.01,
+            color_threshold: 0.01,
         }
     }
 }
@@ -213,10 +218,11 @@ impl FromWorld for RatatuiCameraNodeSobelPipeline {
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
                 (
+                    // rendered texture
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
                     // depth prepass
-                    // texture_depth_2d(),
+                    texture_depth_2d(),
                     // normal prepass
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     // view

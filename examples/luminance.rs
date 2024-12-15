@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use bevy::app::AppExit;
 use bevy::app::ScheduleRunnerPlugin;
+use bevy::color::Color;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
@@ -18,10 +19,18 @@ use bevy_ratatui_render::RatatuiCameraPlugin;
 use bevy_ratatui_render::RatatuiCameraStrategy;
 use bevy_ratatui_render::RatatuiCameraWidget;
 use crossterm::event::{KeyCode, KeyEventKind};
+use log::info;
+use log::LevelFilter;
 use ratatui::layout::Alignment;
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::widgets::Block;
+use tui_logger::init_logger;
+use tui_logger::set_default_level;
+use tui_logger::TuiLoggerWidget;
 
 #[derive(Component)]
 pub struct Cube;
@@ -32,6 +41,9 @@ pub struct Flags {
 }
 
 fn main() {
+    init_logger(LevelFilter::Info).unwrap();
+    set_default_level(LevelFilter::Info);
+
     App::new()
         .add_plugins((
             DefaultPlugins
@@ -98,6 +110,12 @@ fn draw_scene_system(
     kitty_enabled: Option<Res<KittyEnabled>>,
 ) -> io::Result<()> {
     ratatui.draw(|frame| {
+        let layout = Layout::new(
+            Direction::Vertical,
+            [Constraint::Percentage(50), Constraint::Fill(1)],
+        )
+        .split(frame.area());
+
         let mut block = Block::bordered()
             .bg(ratatui::style::Color::Rgb(0, 0, 0))
             .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)))
@@ -106,7 +124,7 @@ fn draw_scene_system(
             .title_bottom("[p for panic]")
             .title_alignment(Alignment::Center);
 
-        let inner = block.inner(frame.area());
+        let inner = block.inner(layout[0]);
 
         //TODO: flip not here
         if !flags.debug {
@@ -131,8 +149,16 @@ fn draw_scene_system(
             Block::new().bg(ratatui::style::Color::Rgb(0, 0, 200)),
             frame.area(),
         );
-        frame.render_widget(block, frame.area());
-        frame.render_widget(ratatui_camera_widget.single(), inner);
+        frame.render_widget(block, layout[0]);
+        frame.render_widget(
+            TuiLoggerWidget::default()
+                .block(Block::bordered())
+                .style(Style::default().bg(ratatui::style::Color::Reset)),
+            layout[1],
+        );
+        if let Ok(camera_widget) = ratatui_camera_widget.get_single() {
+            frame.render_widget(camera_widget, inner);
+        }
     })?;
 
     Ok(())
@@ -154,6 +180,7 @@ pub fn handle_input_system(
                 }
                 KeyCode::Char('d') => {
                     flags.debug = !flags.debug;
+                    info!("DEBUG TOGGLED");
                 }
                 _ => {}
             },
