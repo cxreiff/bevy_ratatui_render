@@ -19,7 +19,6 @@ use bevy_ratatui_render::RatatuiCameraPlugin;
 use bevy_ratatui_render::RatatuiCameraStrategy;
 use bevy_ratatui_render::RatatuiCameraWidget;
 use crossterm::event::{KeyCode, KeyEventKind};
-use log::info;
 use log::LevelFilter;
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
@@ -91,6 +90,7 @@ fn setup_scene_system(
     commands.spawn((
         RatatuiCamera {
             strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig {
+                luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_BRAILLE.into(),
                 edge_detection: true,
                 ..default()
             }),
@@ -98,7 +98,7 @@ fn setup_scene_system(
             ..default()
         },
         Camera3d::default(),
-        Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
+        Transform::from_xyz(2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Z),
     ));
 }
 
@@ -112,7 +112,7 @@ fn draw_scene_system(
     ratatui.draw(|frame| {
         let layout = Layout::new(
             Direction::Vertical,
-            [Constraint::Percentage(50), Constraint::Fill(1)],
+            [Constraint::Percentage(66), Constraint::Fill(1)],
         )
         .split(frame.area());
 
@@ -124,10 +124,7 @@ fn draw_scene_system(
             .title_bottom("[p for panic]")
             .title_alignment(Alignment::Center);
 
-        let inner = block.inner(layout[0]);
-
-        //TODO: flip not here
-        if !flags.debug {
+        if flags.debug {
             block = block.title_top(format!(
                 "[kitty protocol: {}]",
                 if kitty_enabled.is_some() {
@@ -145,19 +142,24 @@ fn draw_scene_system(
             }
         }
 
-        frame.render_widget(
-            Block::new().bg(ratatui::style::Color::Rgb(0, 0, 200)),
-            frame.area(),
-        );
-        frame.render_widget(block, layout[0]);
-        frame.render_widget(
-            TuiLoggerWidget::default()
-                .block(Block::bordered())
-                .style(Style::default().bg(ratatui::style::Color::Reset)),
-            layout[1],
-        );
-        if let Ok(camera_widget) = ratatui_camera_widget.get_single() {
-            frame.render_widget(camera_widget, inner);
+        if flags.debug {
+            let inner = block.inner(layout[0]);
+            frame.render_widget(block, layout[0]);
+            frame.render_widget(
+                TuiLoggerWidget::default()
+                    .block(Block::bordered())
+                    .style(Style::default().bg(ratatui::style::Color::Reset)),
+                layout[1],
+            );
+            if let Ok(camera_widget) = ratatui_camera_widget.get_single() {
+                frame.render_widget(camera_widget, inner);
+            }
+        } else {
+            let inner = block.inner(frame.area());
+            frame.render_widget(block, frame.area());
+            if let Ok(camera_widget) = ratatui_camera_widget.get_single() {
+                frame.render_widget(camera_widget, inner);
+            }
         }
     })?;
 
@@ -180,7 +182,6 @@ pub fn handle_input_system(
                 }
                 KeyCode::Char('d') => {
                     flags.debug = !flags.debug;
-                    info!("DEBUG TOGGLED");
                 }
                 _ => {}
             },

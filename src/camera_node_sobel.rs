@@ -163,9 +163,9 @@ pub struct RatatuiCameraNodeSobelConfig {
 impl Default for RatatuiCameraNodeSobelConfig {
     fn default() -> Self {
         Self {
-            depth_threshold: 0.01,
-            normal_threshold: 0.01,
-            color_threshold: 0.01,
+            depth_threshold: 0.1,
+            normal_threshold: 0.1,
+            color_threshold: 0.1,
         }
     }
 }

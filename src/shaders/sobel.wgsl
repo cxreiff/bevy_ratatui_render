@@ -16,16 +16,28 @@ struct Config {
 
 var<private> thickness: f32 = 0.8;
 
-var<private> sobel_x: array<f32, 9> = array<f32, 9>(
+var<private> sobel_horizontal: array<f32, 9> = array<f32, 9>(
     1.0, 0.0, -1.0,
     2.0, 0.0, -2.0,
     1.0, 0.0, -1.0,
 );
 
-var<private> sobel_y: array<f32, 9> = array<f32, 9>(
+var<private> sobel_vertical: array<f32, 9> = array<f32, 9>(
      1.0,  2.0,  1.0,
      0.0,  0.0,  0.0,
     -1.0, -2.0, -1.0,
+);
+
+var<private> sobel_forward: array<f32, 9> = array<f32, 9>(
+     0.0,  1.0,  2.0,
+    -1.0,  0.0,  1.0,
+    -2.0, -1.0,  0.0,
+);
+
+var<private> sobel_backward: array<f32, 9> = array<f32, 9>(
+     2.0,  1.0,  0.0,
+     1.0,  0.0, -1.0,
+     0.0, -1.0, -2.0,
 );
 
 var<private> neighbors: array<vec2f, 9> = array<vec2f, 9>(
@@ -34,21 +46,127 @@ var<private> neighbors: array<vec2f, 9> = array<vec2f, 9>(
     vec2f(-1.0, -1.0), vec2f(0.0, -1.0), vec2f(1.0, -1.0),
 );
 
-fn detect_edge_vec3(samples: ptr<function, array<vec3f, 9>>) -> vec2f {
+fn detect_edge_f32(samples: ptr<function, array<f32, 9>>) -> vec4f {
     var horizontal = vec3f(0.0);
     for (var i = 0; i < 9; i++) {
-        horizontal += (*samples)[i].xyz * sobel_x[i];
+        horizontal += (*samples)[i] * sobel_horizontal[i];
     }
     var vertical = vec3f(0.0);
     for (var i = 0; i < 9; i++) {
-        vertical += (*samples)[i].xyz * sobel_y[i];
+        vertical += (*samples)[i] * sobel_vertical[i];
     }
-    return vec2f(horizontal.x, vertical.x);
+    var forward = vec3f(0.0);
+    for (var i = 0; i < 9; i++) {
+        forward += (*samples)[i] * sobel_forward[i];
+    }
+    var backward = vec3f(0.0);
+    for (var i = 0; i < 9; i++) {
+        backward += (*samples)[i] * sobel_backward[i];
+    }
+
+    let edge = vec4f(
+        sqrt(dot(horizontal, horizontal)),
+        sqrt(dot(vertical, vertical)),
+        sqrt(dot(forward, forward)),
+        sqrt(dot(backward, backward)),
+    );
+
+    return edge;
 }
 
-fn detect_edge_color(frag_coord: vec2f) -> vec2f {
+fn detect_edge_vec3(samples: ptr<function, array<vec3f, 9>>) -> vec4f {
+    var horizontal = vec3f(0.0);
+    for (var i = 0; i < 9; i++) {
+        horizontal += (*samples)[i].xyz * sobel_horizontal[i];
+    }
+    var vertical = vec3f(0.0);
+    for (var i = 0; i < 9; i++) {
+        vertical += (*samples)[i].xyz * sobel_vertical[i];
+    }
+    var forward = vec3f(0.0);
+    for (var i = 0; i < 9; i++) {
+        forward += (*samples)[i].xyz * sobel_forward[i];
+    }
+    var backward = vec3f(0.0);
+    for (var i = 0; i < 9; i++) {
+        backward += (*samples)[i].xyz * sobel_backward[i];
+    }
+
+    let edge = vec4f(
+        sqrt(dot(horizontal, horizontal)),
+        sqrt(dot(vertical, vertical)),
+        sqrt(dot(forward, forward)),
+        sqrt(dot(backward, backward)),
+    );
+
+    return edge;
+}
+
+fn prepass_depth(frag_coord: vec2f) -> f32 {
+    return textureLoad(depth_prepass_texture, vec2i(frag_coord), 0);
+}
+
+fn prepass_normal(frag_coord: vec2f) -> vec3f {
+    return textureLoad(normal_prepass_texture, vec2i(frag_coord), 0).xyz;
+}
+
+fn detect_edge_depth(frag_coord: vec2f) -> vec4f {
+    if config.depth_threshold == 0.0 {
+        return vec4f(0.0);
+    }
+
+    var samples = array<f32, 9>();
+    for (var i = 0; i < 9; i++) {
+        samples[i] =  prepass_depth(frag_coord + neighbors[i] * thickness);
+    }
+
+    var edge = detect_edge_f32(&samples);
+    if edge.x < config.depth_threshold {
+        edge.x = 0.0;
+    }
+    if edge.y < config.depth_threshold {
+        edge.y = 0.0;
+    }
+    if edge.z < config.depth_threshold {
+        edge.z = 0.0;
+    }
+    if edge.w < config.depth_threshold {
+        edge.w = 0.0;
+    }
+
+    return edge;
+}
+
+fn detect_edge_normal(frag_coord: vec2f) -> vec4f {
+    if config.normal_threshold == 0.0 {
+        return vec4f(0.0);
+    }
+
+    var samples = array<vec3f, 9>();
+    for (var i = 0; i < 9; i++) {
+        samples[i] = prepass_normal(frag_coord + neighbors[i] * thickness);
+    }
+
+    var edge = detect_edge_vec3(&samples);
+    if edge.x < config.normal_threshold {
+        edge.x = 0.0;
+    }
+    if edge.y < config.normal_threshold {
+        edge.y = 0.0;
+    }
+    if edge.z < config.normal_threshold {
+        edge.z = 0.0;
+    }
+    if edge.w < config.normal_threshold {
+        edge.w = 0.0;
+    }
+
+    return edge;
+}
+
+fn detect_edge_color(frag_coord: vec2f) -> vec4f {
     if config.color_threshold == 0.0 {
-        return 0.0;
+        return vec4f(0.0);
     }
 
     var samples = array<vec3f, 9>();
@@ -56,7 +174,7 @@ fn detect_edge_color(frag_coord: vec2f) -> vec2f {
         samples[i] = textureLoad(
             screen_texture,
             vec2i(frag_coord + neighbors[i] * thickness),
-            0
+            0,
         ).rgb;
     }
 
@@ -66,6 +184,12 @@ fn detect_edge_color(frag_coord: vec2f) -> vec2f {
     }
     if edge.y < config.color_threshold {
         edge.y = 0.0;
+    }
+    if edge.z < config.color_threshold {
+        edge.z = 0.0;
+    }
+    if edge.w < config.color_threshold {
+        edge.w = 0.0;
     }
 
     return edge;
@@ -77,7 +201,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
 
     let frag_coord = in.position.xy;
     let edge_color = detect_edge_color(frag_coord);
+    let edge_normal = detect_edge_normal(frag_coord);
+    let edge_depth = detect_edge_depth(frag_coord);
+    let edge = max(max(edge_color, edge_normal), edge_depth);
 
-    return vec4f(edge_color, 0.0, edge_color, 1.0);
-    // return vec4f(1.0, 0.0, 0.0, 1.0);
+    return vec4f(edge.x, edge.y, edge.z, edge.w);
 }

@@ -1,6 +1,6 @@
 use bevy::color::Luminance;
 use image::imageops::FilterType;
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use ratatui::prelude::*;
 use ratatui::widgets::WidgetRef;
 
@@ -32,25 +32,11 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             config,
         } = self;
 
-        let Some(image_sobel) = image_sobel else {
-            println!("NO IMAGE_SOBEL");
-            return;
-        };
-
-        let image = image_sobel.resize(
+        let image = image.resize(
             area.width as u32,
             area.height as u32 * 2,
             FilterType::Nearest,
         );
-
-        // if let Some(image_sobel) = image_sobel {
-        //     image = image_sobel.resize(
-        //         area.width as u32,
-        //         area.height as u32 * 2,
-        //         FilterType::Nearest,
-        //     );
-        //     // TODO: handle replacing characters with line characters based on sobel filter.
-        // }
 
         let render_area = Rect {
             x: area.x + area.width.saturating_sub(image.width() as u16) / 2,
@@ -65,19 +51,43 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             config.luminance_scale,
         );
 
-        // if let Some(_image_sobel) = image_sobel {
-        //     // TODO: handle replacing characters with line characters based on sobel filter.
-        // }
+        let image_sobel = image_sobel.as_ref().map(|image_sobel| {
+            image_sobel.resize(
+                area.width as u32,
+                area.height as u32 * 2,
+                FilterType::Nearest,
+            )
+        });
 
-        for (index, (character, color)) in color_characters.iter().enumerate() {
+        for (index, (mut character, color)) in color_characters.iter().enumerate() {
             let x = index as u16 % image.width() as u16;
             let y = index as u16 / image.width() as u16;
             if x >= render_area.width || y >= render_area.height {
                 continue;
             }
 
+            if let Some(ref image_sobel) = image_sobel {
+                let sobel_value = image_sobel.get_pixel(x as u32, y as u32 * 2);
+                let is_max_sobel = |current: u8| {
+                    sobel_value
+                        .0
+                        .iter()
+                        .all(|val| (current > 0) && (current >= *val))
+                };
+
+                if is_max_sobel(sobel_value[0]) {
+                    character = '|';
+                } else if is_max_sobel(sobel_value[1]) {
+                    character = '―';
+                } else if is_max_sobel(sobel_value[2]) {
+                    character = '⟋';
+                } else if is_max_sobel(sobel_value[3]) {
+                    character = '⟍';
+                }
+            };
+
             buf.cell_mut((render_area.x + x, render_area.y + y))
-                .map(|cell| cell.set_fg(*color).set_char(*character));
+                .map(|cell| cell.set_fg(*color).set_char(character));
         }
     }
 }
@@ -104,7 +114,7 @@ impl LuminanceConfig {
         &[' ', '.', ':', '+', '=', '!', '*', '?', '#', '%', '&', '@'];
 
     pub const LUMINANCE_CHARACTERS_BRAILLE: &'static [char] =
-        &['⠁', '⠉', '⠋', '⠛', '⠟', '⠿', '⡿', '⣿'];
+        &[' ', '⠁', '⠉', '⠋', '⠛', '⠟', '⠿', '⡿', '⣿'];
 
     const LUMINANCE_SCALE_DEFAULT: f32 = 9.;
 }
