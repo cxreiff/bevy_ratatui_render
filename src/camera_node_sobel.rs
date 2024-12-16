@@ -10,7 +10,6 @@ use bevy::{
     ecs::query::QueryItem,
     prelude::*,
     render::{
-        extract_resource::{ExtractResource, ExtractResourcePlugin},
         render_asset::RenderAssets,
         render_graph::{
             NodeRunError, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNode, ViewNodeRunner,
@@ -27,21 +26,21 @@ use bevy::{
             UniformBuffer,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
+        sync_world::MainEntity,
         texture::GpuImage,
         view::{ViewTarget, ViewUniform, ViewUniformOffset, ViewUniforms},
         Render, RenderApp, RenderSet,
     },
+    utils::HashMap,
 };
 
-use crate::camera_readback::RatatuiSobelSender;
+use crate::{camera_readback::RatatuiSobelSender, RatatuiCameraEdgeDetection};
 
 pub struct RatatuiCameraNodeSobelPlugin;
 
 impl Plugin for RatatuiCameraNodeSobelPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "src/", "shaders/sobel.wgsl");
-
-        app.add_plugins(ExtractResourcePlugin::<RatatuiCameraNodeSobelConfig>::default());
 
         let render_app = app.sub_app_mut(RenderApp);
 
@@ -61,8 +60,8 @@ impl Plugin for RatatuiCameraNodeSobelPlugin {
     fn finish(&self, app: &mut App) {
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .init_resource::<RatatuiCameraNodeSobelConfigBuffer>()
-            .init_resource::<RatatuiCameraNodeSobelPipeline>();
+            .init_resource::<RatatuiCameraNodeSobelPipeline>()
+            .init_resource::<RatatuiCameraEdgeDetectionBuffers>();
     }
 }
 
@@ -74,6 +73,7 @@ pub struct RatatuiCameraNodeSobelLabel;
 
 impl ViewNode for RatatuiCameraNodeSobel {
     type ViewQuery = (
+        &'static MainEntity,
         &'static ViewTarget,
         &'static ViewPrepassTextures,
         &'static ViewUniformOffset,
@@ -84,7 +84,7 @@ impl ViewNode for RatatuiCameraNodeSobel {
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext<'w>,
-        (view_target, view_prepass_textures, view_uniform_offset, sobel_sender): QueryItem<
+        (entity, view_target, view_prepass_textures, view_uniform_offset, sobel_sender): QueryItem<
             'w,
             Self::ViewQuery,
         >,
@@ -93,6 +93,7 @@ impl ViewNode for RatatuiCameraNodeSobel {
         let gpu_images = world.get_resource::<RenderAssets<GpuImage>>().unwrap();
         let sobel_pipeline = world.resource::<RatatuiCameraNodeSobelPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
+        let config_buffers = world.resource::<RatatuiCameraEdgeDetectionBuffers>();
 
         if let CachedPipelineState::Err(pipeline_error) =
             pipeline_cache.get_render_pipeline_state(sobel_pipeline.pipeline_id)
@@ -104,12 +105,13 @@ impl ViewNode for RatatuiCameraNodeSobel {
             return Ok(());
         };
 
+        let Some(config_buffer) = config_buffers.buffers.get(entity) else {
+            return Ok(());
+        };
+
         let source = view_target.main_texture_view();
         let destination = gpu_images.get(&sobel_sender.sender_image).unwrap();
         let view_uniforms = world.resource::<ViewUniforms>();
-
-        // TODO: pull this data from the LuminanceConfig.
-        let config_buffer = world.resource::<RatatuiCameraNodeSobelConfigBuffer>();
 
         let (Some(depth_prepass), Some(normal_prepass)) = (
             view_prepass_textures.depth_view(),
@@ -131,7 +133,7 @@ impl ViewNode for RatatuiCameraNodeSobel {
                 depth_prepass,
                 normal_prepass,
                 view_uniforms,
-                &config_buffer.buffer,
+                config_buffer,
             )),
         );
 
@@ -153,53 +155,54 @@ impl ViewNode for RatatuiCameraNodeSobel {
     }
 }
 
-#[derive(Resource, ShaderType, ExtractResource, Clone, Copy)]
+#[derive(ShaderType, Default, Clone, Copy)]
 pub struct RatatuiCameraNodeSobelConfig {
-    pub depth_threshold: f32,
-    pub normal_threshold: f32,
-    pub color_threshold: f32,
+    thickness: f32,
+    color_enabled: u32,
+    color_threshold: f32,
+    depth_enabled: u32,
+    depth_threshold: f32,
+    normal_enabled: u32,
+    normal_threshold: f32,
 }
 
-impl Default for RatatuiCameraNodeSobelConfig {
-    fn default() -> Self {
+impl From<&RatatuiCameraEdgeDetection> for RatatuiCameraNodeSobelConfig {
+    fn from(value: &RatatuiCameraEdgeDetection) -> Self {
         Self {
-            depth_threshold: 0.1,
-            normal_threshold: 0.1,
-            color_threshold: 0.1,
+            thickness: value.thickness,
+            color_enabled: value.color_enabled.into(),
+            color_threshold: value.color_threshold,
+            depth_enabled: value.depth_enabled.into(),
+            depth_threshold: value.depth_threshold,
+            normal_enabled: value.normal_enabled.into(),
+            normal_threshold: value.normal_threshold,
         }
     }
 }
 
-#[derive(Resource)]
-pub struct RatatuiCameraNodeSobelConfigBuffer {
-    buffer: UniformBuffer<RatatuiCameraNodeSobelConfig>,
-}
-
-impl FromWorld for RatatuiCameraNodeSobelConfigBuffer {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-        let render_queue = world.resource::<RenderQueue>();
-
-        let config = RatatuiCameraNodeSobelConfig::default();
-        let mut buffer = UniformBuffer::default();
-        buffer.set(config);
-        buffer.write_buffer(render_device, render_queue);
-
-        Self { buffer }
-    }
+#[derive(Resource, Default)]
+pub struct RatatuiCameraEdgeDetectionBuffers {
+    buffers: HashMap<MainEntity, UniformBuffer<RatatuiCameraNodeSobelConfig>>,
 }
 
 fn prepare_config_buffer_system(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mut config_buffer: ResMut<RatatuiCameraNodeSobelConfigBuffer>,
-    config: Res<RatatuiCameraNodeSobelConfig>,
+    mut ratatui_cameras: Query<(&MainEntity, &RatatuiCameraEdgeDetection)>,
+    mut config_buffers: ResMut<RatatuiCameraEdgeDetectionBuffers>,
 ) {
-    let buffer = config_buffer.buffer.get_mut();
-    *buffer = *config;
-    config_buffer
-        .buffer
-        .write_buffer(&render_device, &render_queue);
+    for (entity_id, edge_detection) in &mut ratatui_cameras {
+        let config = RatatuiCameraNodeSobelConfig::from(edge_detection);
+
+        let buffer = config_buffers
+            .buffers
+            .entry(*entity_id)
+            .or_insert(UniformBuffer::default());
+        // let buffer = config_buffer.buffer.get_mut();
+        buffer.set(config);
+        // *buffer = config;
+        buffer.write_buffer(&render_device, &render_queue);
+    }
 }
 
 #[derive(Resource)]

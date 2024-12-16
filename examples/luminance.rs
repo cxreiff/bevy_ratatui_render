@@ -15,6 +15,7 @@ use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
 use bevy_ratatui_render::LuminanceConfig;
 use bevy_ratatui_render::RatatuiCamera;
+use bevy_ratatui_render::RatatuiCameraEdgeDetection;
 use bevy_ratatui_render::RatatuiCameraPlugin;
 use bevy_ratatui_render::RatatuiCameraStrategy;
 use bevy_ratatui_render::RatatuiCameraWidget;
@@ -59,7 +60,6 @@ fn main() {
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, draw_scene_system.map(error))
         .add_systems(PreUpdate, handle_input_system)
-        .add_systems(Update, rotate_cube_system.after(handle_input_system))
         .run();
 }
 
@@ -72,7 +72,7 @@ fn setup_scene_system(
         Cube,
         Mesh3d(meshes.add(Cuboid::default())),
         MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.4, 0.54, 0.7),
+            base_color: Color::srgb(0.6, 0.7, 0.9),
             ..Default::default()
         })),
     ));
@@ -80,25 +80,19 @@ fn setup_scene_system(
         Mesh3d(meshes.add(Cuboid::new(15., 15., 1.))),
         Transform::from_xyz(0., 0., -6.),
     ));
-    commands.spawn((
-        PointLight {
-            shadows_enabled: true,
-            ..Default::default()
-        },
-        Transform::from_xyz(3., 4., 6.),
-    ));
+    commands.spawn((PointLight::default(), Transform::from_xyz(3., 4., 6.)));
     commands.spawn((
         RatatuiCamera {
             strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig {
                 luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_BRAILLE.into(),
-                edge_detection: true,
                 ..default()
             }),
             autoresize: true,
             ..default()
         },
+        RatatuiCameraEdgeDetection::default(),
         Camera3d::default(),
-        Transform::from_xyz(2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Z),
+        Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),
     ));
 }
 
@@ -167,6 +161,7 @@ fn draw_scene_system(
 }
 
 pub fn handle_input_system(
+    mut commands: Commands,
     mut rat_events: EventReader<KeyEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
@@ -183,6 +178,12 @@ pub fn handle_input_system(
                 KeyCode::Char('d') => {
                     flags.debug = !flags.debug;
                 }
+                KeyCode::Left => {
+                    commands.run_system_cached(rotate_cube_system_left);
+                }
+                KeyCode::Right => {
+                    commands.run_system_cached(rotate_cube_system_right);
+                }
                 _ => {}
             },
             _ => {}
@@ -190,6 +191,10 @@ pub fn handle_input_system(
     }
 }
 
-fn rotate_cube_system(time: Res<Time>, mut cube: Query<&mut Transform, With<Cube>>) {
+fn rotate_cube_system_left(time: Res<Time>, mut cube: Query<&mut Transform, With<Cube>>) {
+    cube.single_mut().rotate_z(-time.delta_secs());
+}
+
+fn rotate_cube_system_right(time: Res<Time>, mut cube: Query<&mut Transform, With<Cube>>) {
     cube.single_mut().rotate_z(time.delta_secs());
 }

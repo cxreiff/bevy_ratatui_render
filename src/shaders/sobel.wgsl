@@ -2,9 +2,16 @@
 #import bevy_render::view::View
 
 struct Config {
-    depth_threshold: f32,
-    normal_threshold: f32,
+    thickness: f32,
+
+    color_enabled: u32,
     color_threshold: f32,
+
+    depth_enabled: u32,
+    depth_threshold: f32,
+
+    normal_enabled: u32,
+    normal_threshold: f32,
 };
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
@@ -14,7 +21,7 @@ struct Config {
 @group(0) @binding(4) var<uniform> view: View;
 @group(0) @binding(5) var<uniform> config: Config;
 
-var<private> thickness: f32 = 0.8;
+var<private> thickness: f32 = 1.4;
 
 var<private> sobel_horizontal: array<f32, 9> = array<f32, 9>(
     1.0, 0.0, -1.0,
@@ -200,10 +207,14 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let color = textureSample(screen_texture, texture_sampler, in.uv);
 
     let frag_coord = in.position.xy;
-    let edge_color = detect_edge_color(frag_coord);
-    let edge_normal = detect_edge_normal(frag_coord);
-    let edge_depth = detect_edge_depth(frag_coord);
-    let edge = max(max(edge_color, edge_normal), edge_depth);
+    let edge_color = detect_edge_color(frag_coord) * 2.;
+    let edge_normal = detect_edge_normal(frag_coord) * 0.5;
+    let edge_depth = detect_edge_depth(frag_coord) * 10.;
+
+    var edge = vec4f(0.0);
+    edge = max(edge, edge_color);
+    edge = max(edge, edge_normal);
+    edge = max(edge, edge_depth);
 
     return vec4f(edge.x, edge.y, edge.z, edge.w);
 }

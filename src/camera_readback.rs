@@ -15,22 +15,25 @@ use crossbeam_channel::Sender;
 
 use crate::{
     camera_image_pipe::{create_image_pipe, ImageReceiver, ImageSender},
-    RatatuiCamera, RatatuiCameraStrategy, RatatuiCameraWidget,
+    RatatuiCamera, RatatuiCameraEdgeDetection, RatatuiCameraWidget,
 };
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins((
         ExtractComponentPlugin::<RatatuiCameraSender>::default(),
         ExtractComponentPlugin::<RatatuiSobelSender>::default(),
+        ExtractComponentPlugin::<RatatuiCameraEdgeDetection>::default(),
     ))
     .add_systems(PostStartup, initial_autoresize_system)
     .add_systems(
         First,
         (
             spawn_ratatui_camera_machinery_system,
-            receive_camera_images_system,
-        ),
+            spawn_ratatui_camera_edge_detection_machinery_system,
+        )
+            .chain(),
     )
+    .add_systems(First, receive_camera_images_system)
     .add_systems(Update, autoresize_ratatui_camera_system);
 
     let render_app = app.sub_app_mut(RenderApp);
@@ -65,23 +68,31 @@ fn spawn_ratatui_camera_machinery_system(
 
         entity.insert(RatatuiCameraSender(sender));
 
-        let mut widget = RatatuiCameraWidget {
+        let widget = RatatuiCameraWidget {
             camera_receiver: receiver,
             sobel_receiver: None,
             strategy: ratatui_camera.strategy.clone(),
         };
 
-        match ratatui_camera.strategy {
-            RatatuiCameraStrategy::HalfBlocks => {}
-            RatatuiCameraStrategy::Luminance(_) => {
-                let (sender, receiver) =
-                    create_image_pipe(&mut images, &render_device, ratatui_camera.dimensions);
-                entity.insert((RatatuiSobelSender(sender), DepthPrepass, NormalPrepass));
-                widget.sobel_receiver = Some(receiver);
-            }
-        }
-
         entity.insert(widget);
+    }
+}
+
+fn spawn_ratatui_camera_edge_detection_machinery_system(
+    mut commands: Commands,
+    mut ratatui_cameras: Query<
+        (Entity, &RatatuiCamera, &mut RatatuiCameraWidget),
+        Added<RatatuiCameraEdgeDetection>,
+    >,
+    mut images: ResMut<Assets<Image>>,
+    render_device: Res<RenderDevice>,
+) {
+    for (entity_id, ratatui_camera, mut widget) in &mut ratatui_cameras {
+        let mut entity = commands.entity(entity_id);
+        let (sender, receiver) =
+            create_image_pipe(&mut images, &render_device, ratatui_camera.dimensions);
+        entity.insert((RatatuiSobelSender(sender), DepthPrepass, NormalPrepass));
+        widget.sobel_receiver = Some(receiver);
     }
 }
 

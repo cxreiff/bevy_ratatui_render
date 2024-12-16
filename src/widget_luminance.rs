@@ -4,6 +4,8 @@ use image::{DynamicImage, GenericImageView};
 use ratatui::prelude::*;
 use ratatui::widgets::WidgetRef;
 
+use crate::camera::LuminanceConfig;
+
 pub struct RatatuiRenderWidgetLuminance {
     image: DynamicImage,
     image_sobel: Option<DynamicImage>,
@@ -86,37 +88,11 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
                 }
             };
 
-            buf.cell_mut((render_area.x + x, render_area.y + y))
-                .map(|cell| cell.set_fg(*color).set_char(character));
+            if let Some(cell) = buf.cell_mut((render_area.x + x, render_area.y + y)) {
+                cell.set_fg(*color).set_char(character);
+            }
         }
     }
-}
-
-#[derive(Clone)]
-pub struct LuminanceConfig {
-    pub luminance_characters: Vec<char>,
-    pub luminance_scale: f32,
-    pub edge_detection: bool,
-}
-
-impl Default for LuminanceConfig {
-    fn default() -> Self {
-        Self {
-            luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_DEFAULT.into(),
-            luminance_scale: LuminanceConfig::LUMINANCE_SCALE_DEFAULT,
-            edge_detection: false,
-        }
-    }
-}
-
-impl LuminanceConfig {
-    pub const LUMINANCE_CHARACTERS_DEFAULT: &'static [char] =
-        &[' ', '.', ':', '+', '=', '!', '*', '?', '#', '%', '&', '@'];
-
-    pub const LUMINANCE_CHARACTERS_BRAILLE: &'static [char] =
-        &[' ', '⠁', '⠉', '⠋', '⠛', '⠟', '⠿', '⡿', '⣿'];
-
-    const LUMINANCE_SCALE_DEFAULT: f32 = 9.;
 }
 
 fn convert_image_to_color_characters(
