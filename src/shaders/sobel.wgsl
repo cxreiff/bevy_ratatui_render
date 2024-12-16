@@ -118,13 +118,13 @@ fn prepass_normal(frag_coord: vec2f) -> vec3f {
 }
 
 fn detect_edge_depth(frag_coord: vec2f) -> vec4f {
-    if config.depth_threshold == 0.0 {
+    if config.depth_enabled == 0u {
         return vec4f(0.0);
     }
 
     var samples = array<f32, 9>();
     for (var i = 0; i < 9; i++) {
-        samples[i] =  prepass_depth(frag_coord + neighbors[i] * thickness);
+        samples[i] =  prepass_depth(frag_coord + neighbors[i] * config.thickness);
     }
 
     var edge = detect_edge_f32(&samples);
@@ -145,13 +145,13 @@ fn detect_edge_depth(frag_coord: vec2f) -> vec4f {
 }
 
 fn detect_edge_normal(frag_coord: vec2f) -> vec4f {
-    if config.normal_threshold == 0.0 {
+    if config.normal_enabled == 0u {
         return vec4f(0.0);
     }
 
     var samples = array<vec3f, 9>();
     for (var i = 0; i < 9; i++) {
-        samples[i] = prepass_normal(frag_coord + neighbors[i] * thickness);
+        samples[i] = prepass_normal(frag_coord + neighbors[i] * config.thickness);
     }
 
     var edge = detect_edge_vec3(&samples);
@@ -172,7 +172,7 @@ fn detect_edge_normal(frag_coord: vec2f) -> vec4f {
 }
 
 fn detect_edge_color(frag_coord: vec2f) -> vec4f {
-    if config.color_threshold == 0.0 {
+    if config.color_enabled == 0u {
         return vec4f(0.0);
     }
 
@@ -180,7 +180,7 @@ fn detect_edge_color(frag_coord: vec2f) -> vec4f {
     for (var i = 0; i < 9; i++) {
         samples[i] = textureLoad(
             screen_texture,
-            vec2i(frag_coord + neighbors[i] * thickness),
+            vec2i(frag_coord + neighbors[i] * config.thickness),
             0,
         ).rgb;
     }

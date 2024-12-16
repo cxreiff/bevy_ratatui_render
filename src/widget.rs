@@ -3,13 +3,17 @@ use ratatui::widgets::Widget;
 use ratatui::{prelude::*, widgets::WidgetRef};
 
 use crate::camera_image_pipe::ImageReceiver;
-use crate::{RatatuiCameraStrategy, RatatuiRenderWidgetHalfblocks, RatatuiRenderWidgetLuminance};
+use crate::{
+    RatatuiCameraEdgeDetection, RatatuiCameraStrategy, RatatuiRenderWidgetHalfblocks,
+    RatatuiRenderWidgetLuminance,
+};
 
 #[derive(Component)]
 pub struct RatatuiCameraWidget {
     pub camera_receiver: ImageReceiver,
     pub sobel_receiver: Option<ImageReceiver>,
     pub strategy: RatatuiCameraStrategy,
+    pub edge_detection: Option<RatatuiCameraEdgeDetection>,
 }
 
 impl Widget for &RatatuiCameraWidget {
@@ -36,8 +40,13 @@ impl Widget for &RatatuiCameraWidget {
                 RatatuiRenderWidgetHalfblocks::new(image).render_ref(area, buf)
             }
             RatatuiCameraStrategy::Luminance(ref config) => {
-                RatatuiRenderWidgetLuminance::new(image, image_sobel, config.clone())
-                    .render_ref(area, buf);
+                RatatuiRenderWidgetLuminance::new(
+                    image,
+                    image_sobel,
+                    config.clone(),
+                    self.edge_detection,
+                )
+                .render_ref(area, buf);
             }
         }
     }

@@ -5,11 +5,13 @@ use ratatui::prelude::*;
 use ratatui::widgets::WidgetRef;
 
 use crate::camera::LuminanceConfig;
+use crate::RatatuiCameraEdgeDetection;
 
 pub struct RatatuiRenderWidgetLuminance {
     image: DynamicImage,
     image_sobel: Option<DynamicImage>,
     config: LuminanceConfig,
+    edge_detection: Option<RatatuiCameraEdgeDetection>,
 }
 
 impl RatatuiRenderWidgetLuminance {
@@ -17,11 +19,13 @@ impl RatatuiRenderWidgetLuminance {
         image: DynamicImage,
         image_sobel: Option<DynamicImage>,
         config: LuminanceConfig,
+        edge_detection: Option<RatatuiCameraEdgeDetection>,
     ) -> Self {
         Self {
             image,
             image_sobel,
             config,
+            edge_detection,
         }
     }
 }
@@ -32,6 +36,7 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             image,
             image_sobel,
             config,
+            edge_detection,
         } = self;
 
         let image = image.resize(
@@ -69,22 +74,41 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             }
 
             if let Some(ref image_sobel) = image_sobel {
-                let sobel_value = image_sobel.get_pixel(x as u32, y as u32 * 2);
-                let is_max_sobel = |current: u8| {
-                    sobel_value
-                        .0
-                        .iter()
-                        .all(|val| (current > 0) && (current >= *val))
+                let Some(edge_config) = edge_detection else {
+                    return;
                 };
 
-                if is_max_sobel(sobel_value[0]) {
-                    character = '|';
-                } else if is_max_sobel(sobel_value[1]) {
-                    character = '―';
-                } else if is_max_sobel(sobel_value[2]) {
-                    character = '⟋';
-                } else if is_max_sobel(sobel_value[3]) {
-                    character = '⟍';
+                let sobel_value = image_sobel.get_pixel(x as u32, y as u32 * 2);
+
+                match edge_config.edge_characters {
+                    crate::EdgeCharacters::Directional {
+                        vertical,
+                        horizontal,
+                        forward_diagonal,
+                        backward_diagonal,
+                    } => {
+                        let is_max_sobel = |current: u8| {
+                            sobel_value
+                                .0
+                                .iter()
+                                .all(|val| (current > 0) && (current >= *val))
+                        };
+
+                        if is_max_sobel(sobel_value[0]) {
+                            character = vertical;
+                        } else if is_max_sobel(sobel_value[1]) {
+                            character = horizontal;
+                        } else if is_max_sobel(sobel_value[2]) {
+                            character = forward_diagonal;
+                        } else if is_max_sobel(sobel_value[3]) {
+                            character = backward_diagonal;
+                        }
+                    }
+                    crate::EdgeCharacters::Single(edge_character) => {
+                        if sobel_value.0.iter().any(|val| *val > 0) {
+                            character = edge_character;
+                        }
+                    }
                 }
             };
 

@@ -13,6 +13,7 @@ use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::kitty::KittyEnabled;
 use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
+use bevy_ratatui_render::EdgeCharacters;
 use bevy_ratatui_render::LuminanceConfig;
 use bevy_ratatui_render::RatatuiCamera;
 use bevy_ratatui_render::RatatuiCameraEdgeDetection;
@@ -84,13 +85,17 @@ fn setup_scene_system(
     commands.spawn((
         RatatuiCamera {
             strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig {
-                luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_BRAILLE.into(),
+                luminance_characters: vec![' ', '.', ':'],
+                // luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_BRAILLE.into(),
                 ..default()
             }),
             autoresize: true,
             ..default()
         },
-        RatatuiCameraEdgeDetection::default(),
+        RatatuiCameraEdgeDetection {
+            edge_characters: EdgeCharacters::Single('#'),
+            ..default()
+        },
         Camera3d::default(),
         Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),
     ));

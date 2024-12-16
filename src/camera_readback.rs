@@ -72,6 +72,7 @@ fn spawn_ratatui_camera_machinery_system(
             camera_receiver: receiver,
             sobel_receiver: None,
             strategy: ratatui_camera.strategy.clone(),
+            edge_detection: None,
         };
 
         entity.insert(widget);
@@ -81,18 +82,24 @@ fn spawn_ratatui_camera_machinery_system(
 fn spawn_ratatui_camera_edge_detection_machinery_system(
     mut commands: Commands,
     mut ratatui_cameras: Query<
-        (Entity, &RatatuiCamera, &mut RatatuiCameraWidget),
+        (
+            Entity,
+            &RatatuiCamera,
+            &RatatuiCameraEdgeDetection,
+            &mut RatatuiCameraWidget,
+        ),
         Added<RatatuiCameraEdgeDetection>,
     >,
     mut images: ResMut<Assets<Image>>,
     render_device: Res<RenderDevice>,
 ) {
-    for (entity_id, ratatui_camera, mut widget) in &mut ratatui_cameras {
+    for (entity_id, ratatui_camera, edge_detection, mut widget) in &mut ratatui_cameras {
         let mut entity = commands.entity(entity_id);
         let (sender, receiver) =
             create_image_pipe(&mut images, &render_device, ratatui_camera.dimensions);
         entity.insert((RatatuiSobelSender(sender), DepthPrepass, NormalPrepass));
         widget.sobel_receiver = Some(receiver);
+        widget.edge_detection = Some(*edge_detection);
     }
 }
 

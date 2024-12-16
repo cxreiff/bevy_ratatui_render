@@ -9,8 +9,8 @@ mod widget_halfblocks;
 mod widget_luminance;
 
 pub use camera::{
-    LuminanceConfig, RatatuiCamera, RatatuiCameraEdgeDetection, RatatuiCameraPlugin,
-    RatatuiCameraStrategy,
+    EdgeCharacters, LuminanceConfig, RatatuiCamera, RatatuiCameraEdgeDetection,
+    RatatuiCameraPlugin, RatatuiCameraStrategy,
 };
 
 pub use widget::RatatuiCameraWidget;

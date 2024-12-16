@@ -198,9 +198,7 @@ fn prepare_config_buffer_system(
             .buffers
             .entry(*entity_id)
             .or_insert(UniformBuffer::default());
-        // let buffer = config_buffer.buffer.get_mut();
         buffer.set(config);
-        // *buffer = config;
         buffer.write_buffer(&render_device, &render_queue);
     }
 }

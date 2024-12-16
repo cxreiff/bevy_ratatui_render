@@ -79,6 +79,10 @@ pub struct RatatuiCameraEdgeDetection {
 
     pub normal_enabled: bool,
     pub normal_threshold: f32,
+
+    // TODO: add config for controlling edge characters, but replace ExtractComponentPlugin with
+    // custom system that creates ShaderType version of config and inserts that instead.
+    pub edge_characters: EdgeCharacters,
 }
 
 impl Default for RatatuiCameraEdgeDetection {
@@ -94,6 +98,24 @@ impl Default for RatatuiCameraEdgeDetection {
 
             normal_enabled: true,
             normal_threshold: 0.2,
+
+            edge_characters: EdgeCharacters::Directional {
+                vertical: '|',
+                horizontal: '―',
+                forward_diagonal: '⟋',
+                backward_diagonal: '⟍',
+            },
         }
     }
+}
+
+#[derive(Clone, Copy)]
+pub enum EdgeCharacters {
+    Directional {
+        vertical: char,
+        horizontal: char,
+        forward_diagonal: char,
+        backward_diagonal: char,
+    },
+    Single(char),
 }
