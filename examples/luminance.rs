@@ -13,7 +13,6 @@ use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::kitty::KittyEnabled;
 use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_render::EdgeCharacters;
 use bevy_ratatui_render::LuminanceConfig;
 use bevy_ratatui_render::RatatuiCamera;
 use bevy_ratatui_render::RatatuiCameraEdgeDetection;

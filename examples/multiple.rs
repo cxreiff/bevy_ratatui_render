@@ -12,7 +12,9 @@ use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::kitty::KittyEnabled;
 use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
+use bevy_ratatui_render::RatatuiCamera;
+use bevy_ratatui_render::RatatuiCameraPlugin;
+use bevy_ratatui_render::RatatuiCameraWidget;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::style::Style;
@@ -37,9 +39,7 @@ fn main() {
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new("top_left", (128, 128)),
-            RatatuiRenderPlugin::new("top_right", (128, 128)),
-            RatatuiRenderPlugin::new("bottom", (256, 128)),
+            RatatuiCameraPlugin,
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
@@ -55,52 +55,36 @@ fn setup_scene_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    ratatui_render: Res<RatatuiRenderContext>,
 ) {
     commands.spawn((
         Cube,
         Mesh3d(meshes.add(Cuboid::default())),
         MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.4, 0.54, 0.7),
+            base_color: Color::srgb(0.4, 0.6, 0.8),
             ..Default::default()
         })),
     ));
+    commands.spawn((PointLight::default(), Transform::from_xyz(3., 4., 6.)));
     commands.spawn((
-        PointLight {
-            shadows_enabled: true,
-            ..Default::default()
-        },
-        Transform::from_xyz(3., 4., 6.),
-    ));
-    commands.spawn((
+        RatatuiCamera::default(),
         Camera3d::default(),
-        Camera {
-            target: ratatui_render.target("top_left").unwrap(),
-            ..default()
-        },
         Transform::from_xyz(0., 3., 0.).looking_at(Vec3::ZERO, Vec3::Z),
     ));
     commands.spawn((
+        RatatuiCamera::default(),
         Camera3d::default(),
-        Camera {
-            target: ratatui_render.target("top_right").unwrap(),
-            ..default()
-        },
         Transform::from_xyz(0., 0., 3.).looking_at(Vec3::ZERO, Vec3::Z),
     ));
     commands.spawn((
+        RatatuiCamera::default(),
         Camera3d::default(),
-        Camera {
-            target: ratatui_render.target("bottom").unwrap(),
-            ..default()
-        },
         Transform::from_xyz(2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Z),
     ));
 }
 
 fn draw_scene_system(
     mut ratatui: ResMut<RatatuiContext>,
-    ratatui_render: Res<RatatuiRenderContext>,
+    camera_widgets: Query<&RatatuiCameraWidget>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
     kitty_enabled: Option<Res<KittyEnabled>>,
@@ -160,9 +144,10 @@ fn draw_scene_system(
         let inner_top_right = top_right_block.inner(top_right);
         let inner_bottom = bottom_block.inner(bottom);
 
-        let top_left_widget = ratatui_render.widget("top_left").unwrap();
-        let top_right_widget = ratatui_render.widget("top_right").unwrap();
-        let bottom_widget = ratatui_render.widget("bottom").unwrap();
+        let mut widgets = camera_widgets.iter();
+        let top_left_widget = widgets.next().unwrap();
+        let top_right_widget = widgets.next().unwrap();
+        let bottom_widget = widgets.next().unwrap();
 
         frame.render_widget(block, frame.area());
         frame.render_widget(top_left_block, top_left);
