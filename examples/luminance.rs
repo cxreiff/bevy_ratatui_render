@@ -51,15 +51,16 @@ fn main() {
                 .build()
                 .disable::<WinitPlugin>()
                 .disable::<LogPlugin>(),
-            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
+            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 90.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugins::default(),
             RatatuiCameraPlugin,
         ))
-        .insert_resource(Flags::default())
+        .insert_resource(Flags { debug: false })
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_scene_system)
         .add_systems(Update, draw_scene_system.map(error))
+        .add_systems(Update, rotate_cube_system)
         .add_systems(PreUpdate, handle_input_system)
         .run();
 }
@@ -84,18 +85,11 @@ fn setup_scene_system(
     commands.spawn((PointLight::default(), Transform::from_xyz(3., 4., 6.)));
     commands.spawn((
         RatatuiCamera {
-            strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig {
-                luminance_characters: vec![' ', '.', ':'],
-                // luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_BRAILLE.into(),
-                ..default()
-            }),
+            strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
             autoresize: true,
             ..default()
         },
-        RatatuiCameraEdgeDetection {
-            edge_characters: EdgeCharacters::Single('#'),
-            ..default()
-        },
+        RatatuiCameraEdgeDetection::default(),
         Camera3d::default(),
         Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),
     ));
@@ -166,7 +160,6 @@ fn draw_scene_system(
 }
 
 pub fn handle_input_system(
-    mut commands: Commands,
     mut rat_events: EventReader<KeyEvent>,
     mut exit: EventWriter<AppExit>,
     mut flags: ResMut<Flags>,
@@ -183,12 +176,6 @@ pub fn handle_input_system(
                 KeyCode::Char('d') => {
                     flags.debug = !flags.debug;
                 }
-                KeyCode::Left => {
-                    commands.run_system_cached(rotate_cube_system_left);
-                }
-                KeyCode::Right => {
-                    commands.run_system_cached(rotate_cube_system_right);
-                }
                 _ => {}
             },
             _ => {}
@@ -196,10 +183,6 @@ pub fn handle_input_system(
     }
 }
 
-fn rotate_cube_system_left(time: Res<Time>, mut cube: Query<&mut Transform, With<Cube>>) {
-    cube.single_mut().rotate_z(-time.delta_secs());
-}
-
-fn rotate_cube_system_right(time: Res<Time>, mut cube: Query<&mut Transform, With<Cube>>) {
+fn rotate_cube_system(time: Res<Time>, mut cube: Query<&mut Transform, With<Cube>>) {
     cube.single_mut().rotate_z(time.delta_secs());
 }

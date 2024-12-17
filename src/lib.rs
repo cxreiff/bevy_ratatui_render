@@ -3,7 +3,6 @@ mod camera_image_pipe;
 mod camera_node;
 mod camera_node_sobel;
 mod camera_readback;
-mod utilities;
 mod widget;
 mod widget_halfblocks;
 mod widget_luminance;

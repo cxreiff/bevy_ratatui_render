@@ -1,4 +1,5 @@
 use bevy::{prelude::*, render::extract_component::ExtractComponent};
+use ratatui::style::Color;
 
 use crate::{camera_node, camera_node_sobel, camera_readback};
 
@@ -47,11 +48,11 @@ pub struct LuminanceConfig {
 }
 
 impl LuminanceConfig {
-    pub const LUMINANCE_CHARACTERS_DEFAULT: &'static [char] =
-        &[' ', '.', ':', '+', '=', '!', '*', '?', '#', '%', '&', '@'];
-
     pub const LUMINANCE_CHARACTERS_BRAILLE: &'static [char] =
         &[' ', '⠁', '⠉', '⠋', '⠛', '⠟', '⠿', '⡿', '⣿'];
+
+    pub const LUMINANCE_CHARACTERS_MISC: &'static [char] =
+        &[' ', '.', ':', '+', '=', '!', '*', '?', '#', '%', '&', '@'];
 
     pub const LUMINANCE_CHARACTERS_SHADING: &'static [char] = &[' ', '░', '▒', '▓', '█'];
 
@@ -61,7 +62,7 @@ impl LuminanceConfig {
 impl Default for LuminanceConfig {
     fn default() -> Self {
         Self {
-            luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_DEFAULT.into(),
+            luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_BRAILLE.into(),
             luminance_scale: LuminanceConfig::LUMINANCE_SCALE_DEFAULT,
         }
     }
@@ -83,6 +84,7 @@ pub struct RatatuiCameraEdgeDetection {
     // TODO: add config for controlling edge characters, but replace ExtractComponentPlugin with
     // custom system that creates ShaderType version of config and inserts that instead.
     pub edge_characters: EdgeCharacters,
+    pub edge_color: Option<Color>,
 }
 
 impl Default for RatatuiCameraEdgeDetection {
@@ -99,23 +101,30 @@ impl Default for RatatuiCameraEdgeDetection {
             normal_enabled: true,
             normal_threshold: 0.2,
 
-            edge_characters: EdgeCharacters::Directional {
-                vertical: '|',
-                horizontal: '―',
-                forward_diagonal: '⟋',
-                backward_diagonal: '⟍',
-            },
+            edge_characters: EdgeCharacters::default(),
+            edge_color: None,
         }
     }
 }
 
 #[derive(Clone, Copy)]
 pub enum EdgeCharacters {
+    Single(char),
     Directional {
         vertical: char,
         horizontal: char,
         forward_diagonal: char,
         backward_diagonal: char,
     },
-    Single(char),
+}
+
+impl Default for EdgeCharacters {
+    fn default() -> Self {
+        Self::Directional {
+            vertical: '|',
+            horizontal: '―',
+            forward_diagonal: '⟋',
+            backward_diagonal: '⟍',
+        }
+    }
 }

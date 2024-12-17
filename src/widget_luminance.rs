@@ -7,39 +7,39 @@ use ratatui::widgets::WidgetRef;
 use crate::camera::LuminanceConfig;
 use crate::RatatuiCameraEdgeDetection;
 
-pub struct RatatuiRenderWidgetLuminance {
-    image: DynamicImage,
-    image_sobel: Option<DynamicImage>,
-    config: LuminanceConfig,
-    edge_detection: Option<RatatuiCameraEdgeDetection>,
+pub struct RatatuiRenderWidgetLuminance<'a> {
+    camera_image: &'a DynamicImage,
+    sobel_image: &'a Option<DynamicImage>,
+    strategy_config: &'a LuminanceConfig,
+    edge_detection: &'a Option<RatatuiCameraEdgeDetection>,
 }
 
-impl RatatuiRenderWidgetLuminance {
+impl<'a> RatatuiRenderWidgetLuminance<'a> {
     pub fn new(
-        image: DynamicImage,
-        image_sobel: Option<DynamicImage>,
-        config: LuminanceConfig,
-        edge_detection: Option<RatatuiCameraEdgeDetection>,
+        camera_image: &'a DynamicImage,
+        sobel_image: &'a Option<DynamicImage>,
+        strategy_config: &'a LuminanceConfig,
+        edge_detection: &'a Option<RatatuiCameraEdgeDetection>,
     ) -> Self {
         Self {
-            image,
-            image_sobel,
-            config,
+            camera_image,
+            sobel_image,
+            strategy_config,
             edge_detection,
         }
     }
 }
 
-impl WidgetRef for RatatuiRenderWidgetLuminance {
+impl WidgetRef for RatatuiRenderWidgetLuminance<'_> {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let Self {
-            image,
-            image_sobel,
-            config,
+            camera_image,
+            sobel_image,
+            strategy_config,
             edge_detection,
         } = self;
 
-        let image = image.resize(
+        let image = camera_image.resize(
             area.width as u32,
             area.height as u32 * 2,
             FilterType::Nearest,
@@ -54,11 +54,11 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
 
         let color_characters = convert_image_to_color_characters(
             &image,
-            &config.luminance_characters,
-            config.luminance_scale,
+            &strategy_config.luminance_characters,
+            strategy_config.luminance_scale,
         );
 
-        let image_sobel = image_sobel.as_ref().map(|image_sobel| {
+        let image_sobel = sobel_image.as_ref().map(|image_sobel| {
             image_sobel.resize(
                 area.width as u32,
                 area.height as u32 * 2,
@@ -66,21 +66,21 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
             )
         });
 
-        for (index, (mut character, color)) in color_characters.iter().enumerate() {
+        for (index, (mut character, mut color)) in color_characters.iter().enumerate() {
             let x = index as u16 % image.width() as u16;
             let y = index as u16 / image.width() as u16;
             if x >= render_area.width || y >= render_area.height {
                 continue;
             }
 
-            if let Some(ref image_sobel) = image_sobel {
-                let Some(edge_config) = edge_detection else {
-                    return;
-                };
+            if let (Some(ref image_sobel), Some(edge_detection)) = (&image_sobel, edge_detection) {
+                if !image_sobel.in_bounds(x as u32, y as u32 * 2) {
+                    continue;
+                }
 
                 let sobel_value = image_sobel.get_pixel(x as u32, y as u32 * 2);
 
-                match edge_config.edge_characters {
+                match edge_detection.edge_characters {
                     crate::EdgeCharacters::Directional {
                         vertical,
                         horizontal,
@@ -96,24 +96,29 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
 
                         if is_max_sobel(sobel_value[0]) {
                             character = vertical;
+                            color = edge_detection.edge_color.unwrap_or(color);
                         } else if is_max_sobel(sobel_value[1]) {
                             character = horizontal;
+                            color = edge_detection.edge_color.unwrap_or(color);
                         } else if is_max_sobel(sobel_value[2]) {
                             character = forward_diagonal;
+                            color = edge_detection.edge_color.unwrap_or(color);
                         } else if is_max_sobel(sobel_value[3]) {
                             character = backward_diagonal;
+                            color = edge_detection.edge_color.unwrap_or(color);
                         }
                     }
                     crate::EdgeCharacters::Single(edge_character) => {
                         if sobel_value.0.iter().any(|val| *val > 0) {
                             character = edge_character;
+                            color = edge_detection.edge_color.unwrap_or(color);
                         }
                     }
                 }
             };
 
             if let Some(cell) = buf.cell_mut((render_area.x + x, render_area.y + y)) {
-                cell.set_fg(*color).set_char(character);
+                cell.set_fg(color).set_char(character);
             }
         }
     }

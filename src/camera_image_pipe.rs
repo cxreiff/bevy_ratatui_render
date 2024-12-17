@@ -1,10 +1,11 @@
 use bevy::{
     asset::RenderAssetUsages,
+    image::TextureFormatPixelInfo,
     prelude::*,
     render::{
         render_resource::{
-            Buffer, BufferDescriptor, BufferUsages, Extent3d, TextureDimension, TextureFormat,
-            TextureUsages,
+            Buffer, BufferDescriptor, BufferUsages, Extent3d, Maintain, MapMode, TextureDimension,
+            TextureFormat, TextureUsages,
         },
         renderer::RenderDevice,
     },
@@ -98,4 +99,52 @@ fn create_image_copy_buffer(render_device: &RenderDevice, (width, height): (u32,
     };
 
     render_device.create_buffer(&buffer_descriptor)
+}
+
+pub fn send_image_buffer(render_device: &RenderDevice, buffer: &Buffer, sender: &Sender<Vec<u8>>) {
+    let buffer_slice = buffer.slice(..);
+
+    let (s, r) = crossbeam_channel::bounded(1);
+
+    buffer_slice.map_async(MapMode::Read, move |r| match r {
+        Ok(r) => s.send(r).expect("failed to send map update"),
+        Err(err) => panic!("failed to map buffer: {err}"),
+    });
+
+    render_device.poll(Maintain::wait()).panic_on_timeout();
+
+    r.recv().expect("failed to receive the map_async message");
+
+    let _ = sender.send(buffer_slice.get_mapped_range().to_vec());
+
+    buffer.unmap();
+}
+
+pub fn receive_image(image_receiver: &mut ImageReceiver) {
+    let mut image_data = Vec::new();
+    while let Ok(data) = image_receiver.receiver.try_recv() {
+        image_data = data;
+    }
+
+    if !image_data.is_empty() {
+        let row_bytes = image_receiver.receiver_image.width() as usize
+            * image_receiver
+                .receiver_image
+                .texture_descriptor
+                .format
+                .pixel_size();
+
+        let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
+
+        if row_bytes == aligned_row_bytes {
+            image_receiver.receiver_image.data.clone_from(&image_data);
+        } else {
+            image_receiver.receiver_image.data = image_data
+                .chunks(aligned_row_bytes)
+                .take(image_receiver.receiver_image.height() as usize)
+                .flat_map(|row| &row[..row_bytes.min(row.len())])
+                .cloned()
+                .collect();
+        }
+    }
 }

@@ -34,7 +34,10 @@ pub struct RatatuiCameraLabel;
 
 impl ViewNode for RatatuiCameraNode {
     // TODO: RatatuiSobelSender has to be removed here for when sobel is absent.
-    type ViewQuery = (&'static RatatuiCameraSender, &'static RatatuiSobelSender);
+    type ViewQuery = (
+        &'static RatatuiCameraSender,
+        Option<&'static RatatuiSobelSender>,
+    );
 
     fn run<'w>(
         &self,
@@ -46,10 +49,12 @@ impl ViewNode for RatatuiCameraNode {
         let gpu_images = world.get_resource::<RenderAssets<GpuImage>>().unwrap();
 
         let src_image = gpu_images.get(&camera_sender.sender_image).unwrap();
-        let src_image_sobel = gpu_images.get(&sobel_sender.sender_image).unwrap();
-
         copy_to_buffer(render_context, world, src_image, &camera_sender.buffer);
-        copy_to_buffer(render_context, world, src_image_sobel, &sobel_sender.buffer);
+
+        if let Some(sobel_sender) = sobel_sender {
+            let src_image_sobel = gpu_images.get(&sobel_sender.sender_image).unwrap();
+            copy_to_buffer(render_context, world, src_image_sobel, &sobel_sender.buffer);
+        }
 
         Ok(())
     }

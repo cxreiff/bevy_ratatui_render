@@ -10,6 +10,7 @@ use bevy::{
     ecs::query::QueryItem,
     prelude::*,
     render::{
+        extract_component::ExtractComponentPlugin,
         render_asset::RenderAssets,
         render_graph::{
             NodeRunError, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNode, ViewNodeRunner,
@@ -41,6 +42,8 @@ pub struct RatatuiCameraNodeSobelPlugin;
 impl Plugin for RatatuiCameraNodeSobelPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "src/", "shaders/sobel.wgsl");
+
+        app.add_plugins(ExtractComponentPlugin::<RatatuiCameraEdgeDetection>::default());
 
         let render_app = app.sub_app_mut(RenderApp);
 

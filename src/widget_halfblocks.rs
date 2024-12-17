@@ -6,25 +6,22 @@ use ratatui_image::{
     FilterType, Resize,
 };
 
-pub struct RatatuiRenderWidgetHalfblocks {
-    image: DynamicImage,
-    picker: Picker,
+pub struct RatatuiRenderWidgetHalfblocks<'a> {
+    image: &'a DynamicImage,
 }
 
-impl RatatuiRenderWidgetHalfblocks {
-    pub fn new(image: DynamicImage) -> Self {
-        let mut picker = Picker::from_fontsize((1, 2));
-        picker.set_protocol_type(ProtocolType::Halfblocks);
-
-        Self { image, picker }
+impl<'a> RatatuiRenderWidgetHalfblocks<'a> {
+    pub fn new(image: &'a DynamicImage) -> Self {
+        Self { image }
     }
 }
 
-impl WidgetRef for RatatuiRenderWidgetHalfblocks {
+impl WidgetRef for RatatuiRenderWidgetHalfblocks<'_> {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
-        let Self { image, mut picker } = self;
+        let mut picker = Picker::from_fontsize((1, 2));
+        picker.set_protocol_type(ProtocolType::Halfblocks);
 
-        let image = image.resize(
+        let image = self.image.resize(
             area.width as u32,
             area.height as u32 * 2,
             FilterType::Nearest,
