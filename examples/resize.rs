@@ -58,6 +58,7 @@ fn setup_scene_system(
     ));
     commands.spawn((
         RatatuiCamera {
+            autoprint: true,
             autoresize: true,
             autoresize_function: |(width, height)| (width * 4, height * 3),
             ..default()

@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::extract_component::ExtractComponent};
 use ratatui::style::Color;
 
-use crate::{camera_node, camera_node_sobel, camera_readback};
+use crate::{camera_autoprint, camera_node, camera_node_sobel, camera_readback};
 
 pub struct RatatuiCameraPlugin;
 
@@ -11,6 +11,7 @@ impl Plugin for RatatuiCameraPlugin {
             camera_readback::plugin,
             camera_node::plugin,
             camera_node_sobel::RatatuiCameraNodeSobelPlugin,
+            camera_autoprint::plugin,
         ));
     }
 }
@@ -20,6 +21,7 @@ pub struct RatatuiCamera {
     pub dimensions: (u32, u32),
     pub autoresize: bool,
     pub autoresize_function: fn((u32, u32)) -> (u32, u32),
+    pub autoprint: bool,
     pub strategy: RatatuiCameraStrategy,
 }
 
@@ -29,6 +31,7 @@ impl Default for RatatuiCamera {
             dimensions: (256, 256),
             autoresize: false,
             autoresize_function: |(width, height)| (width * 2, height * 2),
+            autoprint: false,
             strategy: RatatuiCameraStrategy::default(),
         }
     }
@@ -118,6 +121,12 @@ pub enum EdgeCharacters {
 
 impl Default for EdgeCharacters {
     fn default() -> Self {
+        Self::Single('+')
+    }
+}
+
+impl EdgeCharacters {
+    pub fn lines() -> Self {
         Self::Directional {
             vertical: '|',
             horizontal: '―',
