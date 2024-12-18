@@ -7,7 +7,8 @@ use bevy::prelude::*;
 use bevy::winit::WinitPlugin;
 use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
+use bevy_ratatui_render::RatatuiCamera;
+use bevy_ratatui_render::RatatuiCameraPlugin;
 use crossterm::event::{KeyCode, KeyEventKind};
 
 #[derive(Component)]
@@ -22,10 +23,7 @@ fn main() {
                 .disable::<LogPlugin>(),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new("main", (256, 256))
-                .print_full_terminal()
-                .autoresize()
-                .autoresize_conversion_fn(|(width, height)| (width * 4, height * 3)),
+            RatatuiCameraPlugin,
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup_scene_system)
@@ -38,7 +36,6 @@ fn setup_scene_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    ratatui_render: Res<RatatuiRenderContext>,
 ) {
     commands.spawn((
         Cube,
@@ -60,11 +57,12 @@ fn setup_scene_system(
         Transform::from_xyz(3., 4., 6.),
     ));
     commands.spawn((
-        Camera3d::default(),
-        Camera {
-            target: ratatui_render.target("main").unwrap(),
+        RatatuiCamera {
+            autoresize: true,
+            autoresize_function: |(width, height)| (width * 4, height * 3),
             ..default()
         },
+        Camera3d::default(),
         Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
     ));
 }

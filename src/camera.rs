@@ -15,7 +15,7 @@ impl Plugin for RatatuiCameraPlugin {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct RatatuiCamera {
     pub dimensions: (u32, u32),
     pub autoresize: bool,
@@ -81,8 +81,6 @@ pub struct RatatuiCameraEdgeDetection {
     pub normal_enabled: bool,
     pub normal_threshold: f32,
 
-    // TODO: add config for controlling edge characters, but replace ExtractComponentPlugin with
-    // custom system that creates ShaderType version of config and inserts that instead.
     pub edge_characters: EdgeCharacters,
     pub edge_color: Option<Color>,
 }

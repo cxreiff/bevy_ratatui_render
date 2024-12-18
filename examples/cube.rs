@@ -12,7 +12,9 @@ use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::kitty::KittyEnabled;
 use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_render::{RatatuiRenderContext, RatatuiRenderPlugin};
+use bevy_ratatui_render::RatatuiCamera;
+use bevy_ratatui_render::RatatuiCameraPlugin;
+use bevy_ratatui_render::RatatuiCameraWidget;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::layout::Alignment;
 use ratatui::style::Style;
@@ -37,7 +39,7 @@ fn main() {
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             FrameTimeDiagnosticsPlugin,
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new("main", (256, 256)).autoresize(),
+            RatatuiCameraPlugin,
         ))
         .insert_resource(Flags::default())
         .insert_resource(InputState::Idle)
@@ -53,7 +55,6 @@ fn setup_scene_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    ratatui_render: Res<RatatuiRenderContext>,
 ) {
     commands.spawn((
         Cube,
@@ -75,18 +76,15 @@ fn setup_scene_system(
         Transform::from_xyz(3., 4., 6.),
     ));
     commands.spawn((
+        RatatuiCamera::default(),
         Camera3d::default(),
-        Camera {
-            target: ratatui_render.target("main").unwrap(),
-            ..default()
-        },
         Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
     ));
 }
 
 fn draw_scene_system(
     mut ratatui: ResMut<RatatuiContext>,
-    rat_render: Res<RatatuiRenderContext>,
+    camera_widget: Query<&RatatuiCameraWidget>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
     kitty_enabled: Option<Res<KittyEnabled>>,
@@ -121,7 +119,7 @@ fn draw_scene_system(
         }
 
         frame.render_widget(block, frame.area());
-        frame.render_widget(rat_render.widget("main").unwrap(), inner);
+        frame.render_widget(camera_widget.single(), inner);
     })?;
 
     Ok(())

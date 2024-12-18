@@ -88,6 +88,9 @@ fn setup_scene_system(
             autoresize: true,
             ..default()
         },
+        // TODO: fix orthographic projections.
+        // TODO: fix 2d cameras.
+        // Projection::Orthographic(OrthographicProjection::default_3d()),
         RatatuiCameraEdgeDetection::default(),
         Camera3d::default(),
         Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),

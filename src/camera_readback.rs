@@ -17,21 +17,23 @@ use crate::{
     RatatuiCamera, RatatuiCameraEdgeDetection, RatatuiCameraWidget,
 };
 
-// TODO: Handle readback cleanup when user-facing components are removed.
-
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins((
         ExtractComponentPlugin::<RatatuiCameraSender>::default(),
         ExtractComponentPlugin::<RatatuiSobelSender>::default(),
     ))
+    .add_observer(handle_ratatui_camera_insert_system)
+    .add_observer(handle_ratatui_camera_removal_system)
+    .add_observer(handle_ratatui_edge_detection_insert_system)
+    .add_observer(handle_ratatui_edge_detection_removal_system)
     .add_systems(PostStartup, initial_autoresize_system)
     .add_systems(
-        PreUpdate,
+        First,
         (
             autoresize_ratatui_camera_system,
             (
-                spawn_ratatui_camera_readback_system,
-                spawn_ratatui_sobel_readback_system,
+                update_ratatui_camera_readback_system,
+                update_ratatui_edge_detection_readback_system,
                 receive_camera_images_system,
                 receive_sobel_images_system,
             ),
@@ -59,52 +61,94 @@ pub struct RatatuiSobelSender(ImageSender);
 #[derive(Component, Deref, DerefMut)]
 pub struct RatatuiSobelReceiver(ImageReceiver);
 
-fn spawn_ratatui_camera_readback_system(
+fn handle_ratatui_camera_insert_system(
+    trigger: Trigger<OnInsert, RatatuiCamera>,
     mut commands: Commands,
-    mut ratatui_cameras: Query<
-        (Entity, &mut Camera, &RatatuiCamera),
-        Or<(Added<RatatuiCamera>, Changed<RatatuiCamera>)>,
-    >,
-    mut images: ResMut<Assets<Image>>,
+    mut ratatui_cameras: Query<(&mut Camera, &RatatuiCamera)>,
+    mut image_assets: ResMut<Assets<Image>>,
     render_device: Res<RenderDevice>,
 ) {
-    for (entity_id, mut camera, ratatui_camera) in &mut ratatui_cameras {
-        let mut entity = commands.entity(entity_id);
-
-        let (sender, receiver) =
-            create_image_pipe(&mut images, &render_device, ratatui_camera.dimensions);
-
-        camera.target = RenderTarget::from(sender.sender_image.clone());
-
-        entity.insert((RatatuiCameraSender(sender), RatatuiCameraReceiver(receiver)));
+    if let Ok((mut camera, ratatui_camera)) = ratatui_cameras.get_mut(trigger.entity()) {
+        insert_camera_readback_components(
+            &mut commands,
+            trigger.entity(),
+            &mut image_assets,
+            &render_device,
+            ratatui_camera,
+            &mut camera,
+        );
     }
 }
 
-fn spawn_ratatui_sobel_readback_system(
+fn handle_ratatui_camera_removal_system(
+    trigger: Trigger<OnRemove, RatatuiCamera>,
+    mut commands: Commands,
+) {
+    let mut entity = commands.entity(trigger.entity());
+    entity.remove::<(RatatuiCameraSender, RatatuiCameraReceiver)>();
+}
+
+fn handle_ratatui_edge_detection_insert_system(
+    trigger: Trigger<OnInsert, RatatuiCameraEdgeDetection>,
+    mut commands: Commands,
+    ratatui_cameras: Query<&RatatuiCamera>,
+    mut image_assets: ResMut<Assets<Image>>,
+    render_device: Res<RenderDevice>,
+) {
+    if let Ok(ratatui_camera) = ratatui_cameras.get(trigger.entity()) {
+        insert_edge_detection_readback_components(
+            &mut commands,
+            trigger.entity(),
+            &mut image_assets,
+            &render_device,
+            ratatui_camera,
+        );
+    }
+}
+
+fn handle_ratatui_edge_detection_removal_system(
+    trigger: Trigger<OnRemove, RatatuiCameraEdgeDetection>,
+    mut commands: Commands,
+) {
+    let mut entity = commands.entity(trigger.entity());
+    entity.remove::<(RatatuiSobelSender, RatatuiSobelReceiver)>();
+}
+
+fn update_ratatui_camera_readback_system(
+    mut commands: Commands,
+    mut ratatui_cameras: Query<(Entity, &mut Camera, &RatatuiCamera), Changed<RatatuiCamera>>,
+    mut image_assets: ResMut<Assets<Image>>,
+    render_device: Res<RenderDevice>,
+) {
+    for (entity, mut camera, ratatui_camera) in &mut ratatui_cameras {
+        insert_camera_readback_components(
+            &mut commands,
+            entity,
+            &mut image_assets,
+            &render_device,
+            ratatui_camera,
+            &mut camera,
+        );
+    }
+}
+
+fn update_ratatui_edge_detection_readback_system(
     mut commands: Commands,
     mut ratatui_cameras: Query<
         (Entity, &RatatuiCamera),
-        Or<(
-            Added<RatatuiCameraEdgeDetection>,
-            (With<RatatuiCameraEdgeDetection>, Changed<RatatuiCamera>),
-        )>,
+        (With<RatatuiCameraEdgeDetection>, Changed<RatatuiCamera>),
     >,
-    mut images: ResMut<Assets<Image>>,
+    mut image_assets: ResMut<Assets<Image>>,
     render_device: Res<RenderDevice>,
 ) {
-    for (entity_id, ratatui_camera) in &mut ratatui_cameras {
-        let mut entity = commands.entity(entity_id);
-
-        let (sender, receiver) =
-            create_image_pipe(&mut images, &render_device, ratatui_camera.dimensions);
-
-        entity.insert((
-            RatatuiSobelSender(sender),
-            RatatuiSobelReceiver(receiver),
-            DepthPrepass,
-            NormalPrepass,
-            Msaa::Off,
-        ));
+    for (entity, ratatui_camera) in &mut ratatui_cameras {
+        insert_edge_detection_readback_components(
+            &mut commands,
+            entity,
+            &mut image_assets,
+            &render_device,
+            ratatui_camera,
+        );
     }
 }
 
@@ -200,4 +244,43 @@ fn autoresize_ratatui_camera_system(
             }
         }
     }
+}
+
+fn insert_camera_readback_components(
+    commands: &mut Commands,
+    entity: Entity,
+    image_assets: &mut Assets<Image>,
+    render_device: &RenderDevice,
+    ratatui_camera: &RatatuiCamera,
+    camera: &mut Camera,
+) {
+    let mut entity = commands.entity(entity);
+
+    let (sender, receiver) =
+        create_image_pipe(image_assets, render_device, ratatui_camera.dimensions);
+
+    camera.target = RenderTarget::from(sender.sender_image.clone());
+
+    entity.insert((RatatuiCameraSender(sender), RatatuiCameraReceiver(receiver)));
+}
+
+fn insert_edge_detection_readback_components(
+    commands: &mut Commands,
+    entity: Entity,
+    image_assets: &mut Assets<Image>,
+    render_device: &RenderDevice,
+    ratatui_camera: &RatatuiCamera,
+) {
+    let mut entity = commands.entity(entity);
+
+    let (sender, receiver) =
+        create_image_pipe(image_assets, render_device, ratatui_camera.dimensions);
+
+    entity.insert((
+        RatatuiSobelSender(sender),
+        RatatuiSobelReceiver(receiver),
+        DepthPrepass,
+        NormalPrepass,
+        Msaa::Off,
+    ));
 }
