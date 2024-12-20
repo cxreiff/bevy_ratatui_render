@@ -18,12 +18,16 @@ use bevy::{
 
 use crate::camera_readback::{RatatuiCameraSender, RatatuiSobelSender};
 
-pub(super) fn plugin(app: &mut App) {
-    let render_app = app.sub_app_mut(RenderApp);
+pub struct RatatuiCameraNodePlugin;
 
-    render_app
-        .add_render_graph_node::<ViewNodeRunner<RatatuiCameraNode>>(Core3d, RatatuiCameraLabel);
-    render_app.add_render_graph_edge(Core3d, Node3d::Upscaling, RatatuiCameraLabel);
+impl Plugin for RatatuiCameraNodePlugin {
+    fn build(&self, app: &mut App) {
+        let render_app = app.sub_app_mut(RenderApp);
+
+        render_app
+            .add_render_graph_node::<ViewNodeRunner<RatatuiCameraNode>>(Core3d, RatatuiCameraLabel);
+        render_app.add_render_graph_edge(Core3d, Node3d::Upscaling, RatatuiCameraLabel);
+    }
 }
 
 #[derive(Default)]
@@ -33,7 +37,6 @@ pub struct RatatuiCameraNode;
 pub struct RatatuiCameraLabel;
 
 impl ViewNode for RatatuiCameraNode {
-    // TODO: RatatuiSobelSender has to be removed here for when sobel is absent.
     type ViewQuery = (
         &'static RatatuiCameraSender,
         Option<&'static RatatuiSobelSender>,

@@ -17,36 +17,40 @@ use crate::{
     RatatuiCamera, RatatuiCameraEdgeDetection, RatatuiCameraWidget,
 };
 
-pub(super) fn plugin(app: &mut App) {
-    app.add_plugins((
-        ExtractComponentPlugin::<RatatuiCameraSender>::default(),
-        ExtractComponentPlugin::<RatatuiSobelSender>::default(),
-    ))
-    .add_observer(handle_ratatui_camera_insert_system)
-    .add_observer(handle_ratatui_camera_removal_system)
-    .add_observer(handle_ratatui_edge_detection_insert_system)
-    .add_observer(handle_ratatui_edge_detection_removal_system)
-    .add_systems(PostStartup, initial_autoresize_system)
-    .add_systems(
-        First,
-        (
-            autoresize_ratatui_camera_system,
-            (
-                update_ratatui_camera_readback_system,
-                update_ratatui_edge_detection_readback_system,
-                receive_camera_images_system,
-                receive_sobel_images_system,
-            ),
-            create_ratatui_camera_widgets_system,
-        )
-            .chain(),
-    );
+pub struct RatatuiCameraReadbackPlugin;
 
-    let render_app = app.sub_app_mut(RenderApp);
-    render_app.add_systems(
-        Render,
-        (send_camera_images_system, send_sobel_images_system).after(RenderSet::Render),
-    );
+impl Plugin for RatatuiCameraReadbackPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins((
+            ExtractComponentPlugin::<RatatuiCameraSender>::default(),
+            ExtractComponentPlugin::<RatatuiSobelSender>::default(),
+        ))
+        .add_observer(handle_ratatui_camera_insert_system)
+        .add_observer(handle_ratatui_camera_removal_system)
+        .add_observer(handle_ratatui_edge_detection_insert_system)
+        .add_observer(handle_ratatui_edge_detection_removal_system)
+        .add_systems(PostStartup, initial_autoresize_system)
+        .add_systems(
+            First,
+            (
+                autoresize_ratatui_camera_system,
+                (
+                    update_ratatui_camera_readback_system,
+                    update_ratatui_edge_detection_readback_system,
+                    receive_camera_images_system,
+                    receive_sobel_images_system,
+                ),
+                create_ratatui_camera_widgets_system,
+            )
+                .chain(),
+        );
+
+        let render_app = app.sub_app_mut(RenderApp);
+        render_app.add_systems(
+            Render,
+            (send_camera_images_system, send_sobel_images_system).after(RenderSet::Render),
+        );
+    }
 }
 
 #[derive(Component, ExtractComponent, Clone, Deref, DerefMut)]

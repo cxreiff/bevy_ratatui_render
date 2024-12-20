@@ -207,9 +207,9 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4f {
     let color = textureSample(screen_texture, texture_sampler, in.uv);
 
     let frag_coord = in.position.xy;
-    let edge_color = detect_edge_color(frag_coord) * 2.;
-    let edge_normal = detect_edge_normal(frag_coord) * 0.5;
-    let edge_depth = detect_edge_depth(frag_coord) * 2.;
+    let edge_color = detect_edge_color(frag_coord);
+    let edge_normal = detect_edge_normal(frag_coord);
+    let edge_depth = detect_edge_depth(frag_coord);
 
     var edge = vec4f(0.0);
     edge = max(edge, edge_color);

@@ -84,14 +84,23 @@ fn setup_scene_system(
     commands.spawn((PointLight::default(), Transform::from_xyz(3., 4., 6.)));
     commands.spawn((
         RatatuiCamera {
-            strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
+            strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig {
+                luminance_scale: 7.0,
+                ..default()
+            }),
             autoresize: true,
             ..default()
         },
         // TODO: fix orthographic projections.
         // TODO: fix 2d cameras.
         // Projection::Orthographic(OrthographicProjection::default_3d()),
-        RatatuiCameraEdgeDetection::default(),
+        RatatuiCameraEdgeDetection {
+            edge_color: Some(ratatui::style::Color::Magenta),
+            thickness: 1.8,
+            normal_enabled: false,
+            color_enabled: false,
+            ..default()
+        },
         Camera3d::default(),
         Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),
     ));
@@ -135,9 +144,7 @@ fn draw_scene_system(
             {
                 block = block.title_top(format!("[fps: {value:.0}]"));
             }
-        }
 
-        if flags.debug {
             let inner = block.inner(layout[0]);
             frame.render_widget(block, layout[0]);
             frame.render_widget(

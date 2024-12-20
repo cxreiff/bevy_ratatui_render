@@ -10,8 +10,12 @@ use ratatui::{
 
 use crate::{RatatuiCamera, RatatuiCameraWidget};
 
-pub(super) fn plugin(app: &mut App) {
-    app.add_systems(PostUpdate, autoprint_system.map(error));
+pub struct RatatuiCameraAutoprintPlugin;
+
+impl Plugin for RatatuiCameraAutoprintPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(PostUpdate, autoprint_system.map(error));
+    }
 }
 
 fn autoprint_system(

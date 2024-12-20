@@ -3,11 +3,15 @@ use image::DynamicImage;
 use ratatui::widgets::Widget;
 use ratatui::{prelude::*, widgets::WidgetRef};
 
-use crate::{
-    RatatuiCameraEdgeDetection, RatatuiCameraStrategy, RatatuiRenderWidgetHalfblocks,
-    RatatuiRenderWidgetLuminance,
-};
+use crate::widget_halfblocks::RatatuiRenderWidgetHalfblocks;
+use crate::widget_luminance::RatatuiRenderWidgetLuminance;
+use crate::{RatatuiCameraEdgeDetection, RatatuiCameraStrategy};
 
+/// Ratatui widget that will be inserted into each RatatuiCamera containing entity and updated each
+/// frame with the last image rendered by the camera. When drawn in a ratatui buffer, it will use
+/// the RatatuiCamera's specified RatatuiCameraStrategy to convert the rendered image to unicode
+/// characters, and will draw them in the buffer.
+///
 #[derive(Component)]
 pub struct RatatuiCameraWidget {
     pub camera_image: DynamicImage,
