@@ -252,7 +252,7 @@ impl FromWorld for RatatuiCameraNodeSobelPipeline {
             vertex: fullscreen_shader_vertex_state(),
             fragment: Some(FragmentState {
                 shader: shader_handle,
-                shader_defs: vec!["VIEW_PROJECTION_PERSPECTIVE".into()], // TODO detect projection
+                shader_defs: vec![],
                 entry_point: "fragment".into(),
                 targets: vec![Some(ColorTargetState {
                     format: TextureFormat::bevy_default(),

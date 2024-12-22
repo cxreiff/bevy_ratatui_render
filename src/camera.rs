@@ -18,11 +18,6 @@ pub struct RatatuiCamera {
     /// maintain a 4:3 aspect ratio.
     pub autoresize_function: fn((u32, u32)) -> (u32, u32),
 
-    /// If true, a system will be added that prints each RatatuiCameraWidget to the full terminal
-    /// buffer (laid out horizontally if there are multiple cameras). Use as a shortcut if you do
-    /// not need anything printed besides your camera's rendered image.
-    pub autoprint: bool,
-
     /// Specify the strategy used for converting the rendered image to unicode characters.
     pub strategy: RatatuiCameraStrategy,
 }
@@ -33,7 +28,6 @@ impl Default for RatatuiCamera {
             dimensions: (256, 256),
             autoresize: false,
             autoresize_function: |(w, h)| (w * 2, h * 2),
-            autoprint: false,
             strategy: RatatuiCameraStrategy::default(),
         }
     }

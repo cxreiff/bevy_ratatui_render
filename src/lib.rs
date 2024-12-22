@@ -1,5 +1,4 @@
 mod camera;
-mod camera_autoprint;
 mod camera_image_pipe;
 mod camera_node;
 mod camera_node_sobel;

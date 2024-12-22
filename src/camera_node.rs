@@ -1,5 +1,8 @@
 use bevy::{
-    core_pipeline::core_3d::graph::{Core3d, Node3d},
+    core_pipeline::{
+        core_2d::graph::{Core2d, Node2d},
+        core_3d::graph::{Core3d, Node3d},
+    },
     ecs::query::QueryItem,
     prelude::*,
     render::{
@@ -27,6 +30,10 @@ impl Plugin for RatatuiCameraNodePlugin {
         render_app
             .add_render_graph_node::<ViewNodeRunner<RatatuiCameraNode>>(Core3d, RatatuiCameraLabel);
         render_app.add_render_graph_edge(Core3d, Node3d::Upscaling, RatatuiCameraLabel);
+
+        render_app
+            .add_render_graph_node::<ViewNodeRunner<RatatuiCameraNode>>(Core2d, RatatuiCameraLabel);
+        render_app.add_render_graph_edge(Core2d, Node2d::Upscaling, RatatuiCameraLabel);
     }
 }
 

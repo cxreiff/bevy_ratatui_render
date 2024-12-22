@@ -1,63 +1,37 @@
-use std::io;
-use std::time::Duration;
-
 use bevy::app::AppExit;
-use bevy::app::ScheduleRunnerPlugin;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
-use bevy::log::LogPlugin;
 use bevy::prelude::*;
-use bevy::utils::error;
-use bevy::winit::WinitPlugin;
 use bevy_ratatui::event::KeyEvent;
 use bevy_ratatui::kitty::KittyEnabled;
-use bevy_ratatui::terminal::RatatuiContext;
-use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_render::RatatuiCamera;
-use bevy_ratatui_render::RatatuiCameraPlugin;
-use bevy_ratatui_render::RatatuiCameraWidget;
 use crossterm::event::{KeyCode, KeyEventKind};
-use ratatui::layout::Alignment;
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
+use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::widgets::Block;
+use ratatui::Frame;
+use tui_logger::TuiLoggerWidget;
 
+#[allow(dead_code)]
 #[derive(Component)]
-pub struct Cube;
+pub struct Spinner;
 
+#[allow(dead_code)]
 #[derive(Resource, Default)]
 pub struct Flags {
-    debug: bool,
+    pub debug: bool,
 }
 
-fn main() {
-    App::new()
-        .add_plugins((
-            DefaultPlugins
-                .build()
-                .disable::<WinitPlugin>()
-                .disable::<LogPlugin>(),
-            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
-            FrameTimeDiagnosticsPlugin,
-            RatatuiPlugins::default(),
-            RatatuiCameraPlugin,
-        ))
-        .insert_resource(Flags::default())
-        .insert_resource(InputState::Idle)
-        .insert_resource(ClearColor(Color::BLACK))
-        .add_systems(Startup, setup_scene_system)
-        .add_systems(Update, draw_scene_system.map(error))
-        .add_systems(PreUpdate, handle_input_system)
-        .add_systems(Update, rotate_cube_system.after(handle_input_system))
-        .run();
-}
-
-fn setup_scene_system(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+#[allow(dead_code)]
+pub fn spawn_3d_scene(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
 ) {
     commands.spawn((
-        Cube,
+        Spinner,
         Mesh3d(meshes.add(Cuboid::default())),
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: Color::srgb(0.4, 0.54, 0.7),
@@ -75,64 +49,88 @@ fn setup_scene_system(
         },
         Transform::from_xyz(3., 4., 6.),
     ));
+}
+
+#[allow(dead_code)]
+pub fn spawn_2d_scene(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<ColorMaterial>,
+) {
     commands.spawn((
-        RatatuiCamera::default(),
-        Camera3d::default(),
-        Transform::from_xyz(3., 3., 3.).looking_at(Vec3::ZERO, Vec3::Z),
+        Spinner,
+        Mesh2d(meshes.add(RegularPolygon::new(66.0, 8))),
+        MeshMaterial2d(materials.add(Color::srgb(0.4, 0.4, 0.6))),
     ));
 }
 
-fn draw_scene_system(
-    mut ratatui: ResMut<RatatuiContext>,
-    camera_widget: Query<&RatatuiCameraWidget>,
-    flags: Res<Flags>,
-    diagnostics: Res<DiagnosticsStore>,
-    kitty_enabled: Option<Res<KittyEnabled>>,
-) -> io::Result<()> {
-    ratatui.draw(|frame| {
-        let mut block = Block::bordered()
-            .bg(ratatui::style::Color::Rgb(0, 0, 0))
-            .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)))
-            .title_bottom("[q for quit]")
-            .title_bottom("[d for debug]")
-            .title_bottom("[p for panic]")
-            .title_alignment(Alignment::Center);
+#[allow(dead_code)]
+pub fn debug_frame(
+    frame: &mut Frame,
+    flags: &Flags,
+    diagnostics: &DiagnosticsStore,
+    kitty_enabled: Option<&KittyEnabled>,
+) -> Rect {
+    let mut block = Block::bordered()
+        .bg(ratatui::style::Color::Rgb(0, 0, 0))
+        .border_style(Style::default().bg(ratatui::style::Color::Rgb(0, 0, 0)))
+        .title_bottom("[q for quit]")
+        .title_bottom("[d for debug]")
+        .title_bottom("[p for panic]")
+        .title_alignment(Alignment::Center);
 
-        let inner = block.inner(frame.area());
+    if flags.debug {
+        let layout = Layout::new(
+            Direction::Vertical,
+            [Constraint::Percentage(66), Constraint::Fill(1)],
+        )
+        .split(frame.area());
 
-        if flags.debug {
-            block = block.title_top(format!(
-                "[kitty protocol: {}]",
-                if kitty_enabled.is_some() {
-                    "enabled"
-                } else {
-                    "disabled"
-                }
-            ));
-
-            if let Some(value) = diagnostics
-                .get(&FrameTimeDiagnosticsPlugin::FPS)
-                .and_then(|fps| fps.smoothed())
-            {
-                block = block.title_top(format!("[fps: {value:.0}]"));
+        block = block.title_top(format!(
+            "[kitty protocol: {}]",
+            if kitty_enabled.is_some() {
+                "enabled"
+            } else {
+                "disabled"
             }
+        ));
+
+        if let Some(value) = diagnostics
+            .get(&FrameTimeDiagnosticsPlugin::FPS)
+            .and_then(|fps| fps.smoothed())
+        {
+            block = block.title_top(format!("[fps: {value:.0}]"));
         }
 
-        frame.render_widget(block, frame.area());
-        frame.render_widget(camera_widget.single(), inner);
-    })?;
+        let inner = block.inner(layout[0]);
+        frame.render_widget(block, layout[0]);
+        frame.render_widget(
+            TuiLoggerWidget::default()
+                .block(Block::bordered())
+                .style(Style::default().bg(ratatui::style::Color::Reset)),
+            layout[1],
+        );
 
-    Ok(())
+        inner
+    } else {
+        let inner = block.inner(frame.area());
+        frame.render_widget(block, frame.area());
+
+        inner
+    }
 }
 
-#[derive(Resource)]
+#[allow(dead_code)]
+#[derive(Resource, Default)]
 pub enum InputState {
     None,
+    #[default]
     Idle,
     Left(f32),
     Right(f32),
 }
 
+#[allow(dead_code)]
 pub fn handle_input_system(
     mut rat_events: EventReader<KeyEvent>,
     mut exit: EventWriter<AppExit>,
@@ -176,9 +174,10 @@ pub fn handle_input_system(
     }
 }
 
-fn rotate_cube_system(
+#[allow(dead_code)]
+pub fn rotate_spinners_system(
     time: Res<Time>,
-    mut cube: Query<&mut Transform, With<Cube>>,
+    mut cube: Query<&mut Transform, With<Spinner>>,
     mut input: ResMut<InputState>,
 ) {
     match *input {

@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
 use crate::{
-    camera_autoprint::RatatuiCameraAutoprintPlugin, camera_node::RatatuiCameraNodePlugin,
-    camera_node_sobel::RatatuiCameraNodeSobelPlugin, camera_readback::RatatuiCameraReadbackPlugin,
+    camera_node::RatatuiCameraNodePlugin, camera_node_sobel::RatatuiCameraNodeSobelPlugin,
+    camera_readback::RatatuiCameraReadbackPlugin,
 };
 
 /// Add this plugin, add a RatatuiCamera component to your camera, and then a RatatuiCameraWidget
@@ -70,7 +70,6 @@ pub struct RatatuiCameraPlugin;
 impl Plugin for RatatuiCameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
-            RatatuiCameraAutoprintPlugin,
             RatatuiCameraNodePlugin,
             RatatuiCameraNodeSobelPlugin,
             RatatuiCameraReadbackPlugin,

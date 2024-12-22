@@ -22,6 +22,9 @@ image = "0.25.5"
 bevy_mod_debugdump = "0.12.0"
 log = "0.4.22"
 
+[dev-dependencies]
+tui-logger = "0.14.0"
+
 [profile.dev]
 opt-level = 1
 
@@ -30,6 +33,3 @@ opt-level = 3
 
 [lints.clippy]
 type_complexity = "allow"
-
-[dev-dependencies]
-tui-logger = "0.14.0"
