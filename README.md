@@ -3,8 +3,8 @@
 Bevy inside the terminal!
 
 Uses bevy headless rendering, [ratatui](https://github.com/ratatui-org/ratatui), and
-[ratatui_image](https://github.com/benjajaja/ratatui-image) to print the rendered output
-of your bevy application to the terminal using unicode halfblocks.
+[ratatui_image](https://github.com/benjajaja/ratatui-image) to print your bevy application's
+rendered frames to the terminal.
 
 <p float="left">
 <img src="https://assets.cxreiff.com/github/cube.gif" width="30%" alt="cube">
@@ -25,91 +25,100 @@ and receiving terminal events (keyboard, focus, mouse, paste, resize) inside bev
 fn main() {
     App::new()
         .add_plugins((
-            // disable WinitPlugin as it panics in environments without a display server
+            // disable WinitPlugin as it panics in environments without a display server.
             // disable LogPlugin as it interferes with terminal output.
             DefaultPlugins.build()
                 .disable::<WinitPlugin>()
                 .disable::<LogPlugin>(),
 
-            // create windowless loop and set its frame rate
+            // create windowless loop and set its frame rate.
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
 
-            // set up the Ratatui context and forward input events
+            // set up the Ratatui context and forward terminal input events.
             RatatuiPlugins::default(),
 
-            // connect a bevy camera target to a ratatui widget
-            RatatuiRenderPlugin::new("main", (256, 256)),
+            // add the ratatui camera plugin.
+            RatatuiCameraPlugin,
         ))
         .add_systems(Startup, setup_scene_system)
-        .add_systems(Update, draw_scene_system.map(error))
-        .run();
+        .add_systems(PostUpdate, draw_scene_system.map(error));
 }
 
-fn setup_scene_system(
-    mut commands: Commands,
-    ratatui_render: Res<RatatuiRenderContext>,
-) {
-    // spawn objects into your scene, and your camera
-
-    ...
-
+// add RatatuiCamera to your scene's camera.
+fn setup_scene_system(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
-        Camera {
-            target: ratatui_render.target("main").unwrap(),
-            ..default()
-        },
+        RatatuiCamera::default(),
     ));
 }
 
+// a RatatuiCameraWidget component will be available in your camera entity.
 fn draw_scene_system(
     mut ratatui: ResMut<RatatuiContext>,
-    ratatui_render: Res<RatatuiRenderContext>,
-) -> io::Result<()> {
+    camera_widget: Query<&RatatuiCameraWidget>,
+) -> std::io::Result<()> {
     ratatui.draw(|frame| {
-        frame.render_widget(ratatui_render.widget("main").unwrap(), frame.size());
+        frame.render_widget(camera_widget.single(), frame.area());
     })?;
 
     Ok(())
 }
 ```
 
-As shown above, `RatatuiRenderPlugin` makes a `RatatuiRenderContext` resource available that has two
-primary methods:
+As shown above, when `RatatuiCameraPlugin` is added to your application, any bevy camera entities that you
+add a `RatatuiCamera` component to, will have a `RatatuiCameraWidget` inserted that you can query for. Each
+`RatatuiCameraWidget` is a ratatui widget that when drawn will print the most recent frame rendered by the
+associated bevy camera, as unicode characters.
 
-- `target(id)`: Provides a bevy `RenderTarget` that can be set as the `target` of a normal bevy camera.
-- `widget(id)`: Provides a ratatui widget that prints the latest render made to the corresponding camera,
-as unicode half-blocks.
+The method by which the rendered image is converted into unicode characters depends on the
+`RatatuiCameraStrategy` that you choose. Refer to the `RatatuiCameraStrategy` documentation for descriptions
+of each.
 
-There is a convenience function if you do not need access to the ratatui draw loop and just would
-like the render to print to the full terminal (for the above example, use this instead of adding the
-`draw_scene_system`):
+## autoresize
 
-```rust
-RatatuiRenderPlugin::new("main", (256, 256)).print_full_terminal()
-```
+By default, the size of the texture the camera renders to will stay constant, and when rendered to the ratatui
+buffer it will be resized to fit the available area while retaining its aspect ratio. If you set the
+`autoresize` attribute to true, the render texture will instead be resized to fit the terminal window.
 
-There is another convenience function for autoresizing the render texture to match the terminal
-dimensions, during startup and when the terminal is resized:
-
-```rust
-RatatuiRenderPlugin::new("main", (1, 1)).autoresize()
-```
-
-To customize how the texture dimensions are calculated from the terminal dimensions, provide a callback
-to `autoresize_conversion_fn`:
+You can also supply an optional `autoresize_function` that converts the terminal dimensions to the dimensions
+that will be used for resizing. This is useful for situations when you want to maintain a specific aspect ratio
+or resize to some fraction of the terminal window.
 
 ```rust
-RatatuiRenderPlugin::new("main", (1, 1))
-    .autoresize()
-    .autoresize_conversion_fn(|(width, height)| (width * 4, height * 3))
+RatatuiCamera {
+    autoresize: true,
+    autoresize_fn: |(w, h)| (w * 4, h * 3),
+    ..default()
+}
 ```
 
-## multiple renders
+## edge detection
 
-`RatatuiRenderPlugin` can be added to bevy multiple times. To access the correct render, use the same
-string id you passed into `RatatuiRenderPlugin::new(id, dimensions)` to call the `target(id)` and
-`widget(id)` methods on the `RatatuiRenderContext` resource.
+When using the `RatatuiCameraStrategy::Luminance` strategy, you can also optionally insert a
+`RatatuiCameraEdgeDetection` component into your camera in order to add an edge detection step in the render
+graph. When printing to the ratatui buffer, special characters and an override color can be used based on the
+detected edges and their directions. This can be useful for certain visual effects, and distinguishing detail
+when the text rendering causes edges to blend together.
+
+Set `edge_characters` to `EdgeCharacters::Single(..)` for a single dedicated edge character, or set it to
+`EdgeCharacters::Directional { .. }` to set different characters based on the "direction" of the edge, for
+example using '-', '|', '/', '\' to draw edge "lines". Detecting the correct edge direction is an area of
+improvement for the current code, so you may need to experiment with color/depth/normal thresholds for good
+results.
+
+```rust
+RatatuiCameraEdgeDetection {
+    thickness: 1.4,
+    edge_characters: EdgeCharacters::Single('+'),
+    edge_color: Some(ratatui::style::Color::Magenta),
+    ..default()
+}
+```
+
+## multiple cameras
+
+`RatatuiCamera` can be added to multiple camera entities. To access the correct render, use marker components
+on your cameras to use when querying `RatatuiCameraWidget`.
 
 ## supported terminals
 

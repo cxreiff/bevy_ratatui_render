@@ -16,7 +16,7 @@ pub struct RatatuiCamera {
     /// When autoresize is true, this function will be used to transform the new terminal
     /// dimensions into the rendered image dimensions. For example, use `|(w, h)| (w*4, h*3)` to
     /// maintain a 4:3 aspect ratio.
-    pub autoresize_function: fn((u32, u32)) -> (u32, u32),
+    pub autoresize_fn: fn((u32, u32)) -> (u32, u32),
 
     /// Specify the strategy used for converting the rendered image to unicode characters.
     pub strategy: RatatuiCameraStrategy,
@@ -27,7 +27,7 @@ impl Default for RatatuiCamera {
         Self {
             dimensions: (256, 256),
             autoresize: false,
-            autoresize_function: |(w, h)| (w * 2, h * 2),
+            autoresize_fn: |(w, h)| (w * 2, h * 2),
             strategy: RatatuiCameraStrategy::default(),
         }
     }

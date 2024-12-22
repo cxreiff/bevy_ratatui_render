@@ -243,7 +243,7 @@ fn autoresize_ratatui_camera_system(
         for mut ratatui_camera in &mut ratatui_cameras {
             if ratatui_camera.autoresize {
                 let terminal_dimensions = (dimensions.width as u32, dimensions.height as u32 * 2);
-                let new_dimensions = (ratatui_camera.autoresize_function)(terminal_dimensions);
+                let new_dimensions = (ratatui_camera.autoresize_fn)(terminal_dimensions);
                 ratatui_camera.dimensions = new_dimensions;
             }
         }
