@@ -10,8 +10,10 @@ use bevy::winit::WinitPlugin;
 use bevy_ratatui::kitty::KittyEnabled;
 use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
+use bevy_ratatui_render::LuminanceConfig;
 use bevy_ratatui_render::RatatuiCamera;
 use bevy_ratatui_render::RatatuiCameraPlugin;
+use bevy_ratatui_render::RatatuiCameraStrategy;
 use bevy_ratatui_render::RatatuiCameraWidget;
 use ratatui::layout::Constraint;
 use ratatui::layout::Direction;
@@ -50,6 +52,7 @@ fn setup_scene_system(
 
     commands.spawn((
         RatatuiCamera::default(),
+        RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
         Camera3d::default(),
         Transform::from_xyz(0., 3., 0.).looking_at(Vec3::ZERO, Vec3::Z),
     ));
@@ -60,6 +63,7 @@ fn setup_scene_system(
     ));
     commands.spawn((
         RatatuiCamera::default(),
+        RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
         Camera3d::default(),
         Transform::from_xyz(2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Z),
     ));

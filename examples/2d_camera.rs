@@ -54,11 +54,8 @@ fn setup_scene_system(
     shared::spawn_2d_scene(&mut commands, &mut meshes, &mut materials);
 
     commands.spawn((
-        RatatuiCamera {
-            strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
-            autoresize: true,
-            ..default()
-        },
+        RatatuiCamera::autoresize(),
+        RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
         Camera2d,
     ));
 }

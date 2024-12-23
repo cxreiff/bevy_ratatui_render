@@ -17,6 +17,9 @@ rendered frames to the terminal.
 Use [bevy_ratatui](https://github.com/joshka/bevy_ratatui/tree/main) for setting ratatui up
 and receiving terminal events (keyboard, focus, mouse, paste, resize) inside bevy.
 
+> [!IMPORTANT]  
+> This crate was renamed from `bevy_ratatui_render` to `bevy_ratatui_camera`.
+
 ## getting started
 
 `cargo add bevy_ratatui_render bevy_ratatui`
@@ -70,9 +73,22 @@ add a `RatatuiCamera` component to, will have a `RatatuiCameraWidget` inserted t
 `RatatuiCameraWidget` is a ratatui widget that when drawn will print the most recent frame rendered by the
 associated bevy camera, as unicode characters.
 
+## strategies
+
 The method by which the rendered image is converted into unicode characters depends on the
-`RatatuiCameraStrategy` that you choose. Refer to the `RatatuiCameraStrategy` documentation for descriptions
-of each.
+`RatatuiCameraStrategy` that you choose. Insert a variant of the component alongside the `RatatuiCamera` to
+change the behavior from the default. Refer to the `RatatuiCameraStrategy` documentation for descriptions
+of each variant.
+
+For example, to use the "Luminance" strategy:
+
+```rust
+commands.spawn((
+    Camera3d::default(),
+    RatatuiCamera::default(),
+    RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
+));
+```
 
 ## autoresize
 

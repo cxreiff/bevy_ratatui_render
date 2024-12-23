@@ -14,7 +14,7 @@ use crate::{
     camera_image_pipe::{
         create_image_pipe, receive_image, send_image_buffer, ImageReceiver, ImageSender,
     },
-    RatatuiCamera, RatatuiCameraEdgeDetection, RatatuiCameraWidget,
+    RatatuiCamera, RatatuiCameraEdgeDetection, RatatuiCameraStrategy, RatatuiCameraWidget,
 };
 
 pub struct RatatuiCameraReadbackPlugin;
@@ -188,17 +188,18 @@ fn receive_sobel_images_system(mut sobel_receivers: Query<&mut RatatuiSobelRecei
 
 fn create_ratatui_camera_widgets_system(
     mut commands: Commands,
-    ratatui_cameras: Query<(
-        Entity,
-        &RatatuiCamera,
-        Option<&RatatuiCameraEdgeDetection>,
-        &RatatuiCameraReceiver,
-        Option<&RatatuiSobelReceiver>,
-    )>,
+    ratatui_cameras: Query<
+        (
+            Entity,
+            &RatatuiCameraStrategy,
+            Option<&RatatuiCameraEdgeDetection>,
+            &RatatuiCameraReceiver,
+            Option<&RatatuiSobelReceiver>,
+        ),
+        With<RatatuiCamera>,
+    >,
 ) {
-    for (entity_id, ratatui_camera, edge_detection, camera_receiver, sobel_receiver) in
-        &ratatui_cameras
-    {
+    for (entity_id, strategy, edge_detection, camera_receiver, sobel_receiver) in &ratatui_cameras {
         let mut entity = commands.entity(entity_id);
 
         let camera_image = match camera_receiver.receiver_image.clone().try_into_dynamic() {
@@ -216,7 +217,7 @@ fn create_ratatui_camera_widgets_system(
         let widget = RatatuiCameraWidget {
             camera_image,
             sobel_image,
-            strategy: ratatui_camera.strategy.clone(),
+            strategy: strategy.clone(),
             edge_detection: edge_detection.cloned(),
         };
 

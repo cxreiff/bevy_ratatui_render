@@ -55,11 +55,8 @@ fn setup_scene_system(
     shared::spawn_3d_scene(&mut commands, &mut meshes, &mut materials);
 
     commands.spawn((
-        RatatuiCamera {
-            strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
-            autoresize: true,
-            ..default()
-        },
+        RatatuiCamera::autoresize(),
+        RatatuiCameraStrategy::Luminance(LuminanceConfig::default()),
         Camera3d::default(),
         Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),
         Projection::Orthographic(OrthographicProjection {

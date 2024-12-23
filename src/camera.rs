@@ -5,6 +5,7 @@ use ratatui::style::Color;
 /// a RatatuiCameraWidget that will be inserted into the same camera entity.
 ///
 #[derive(Component, Clone)]
+#[require(RatatuiCameraStrategy)]
 pub struct RatatuiCamera {
     /// Dimensions (width, height) of the image the camera will render to.
     pub dimensions: (u32, u32),
@@ -17,9 +18,6 @@ pub struct RatatuiCamera {
     /// dimensions into the rendered image dimensions. For example, use `|(w, h)| (w*4, h*3)` to
     /// maintain a 4:3 aspect ratio.
     pub autoresize_fn: fn((u32, u32)) -> (u32, u32),
-
-    /// Specify the strategy used for converting the rendered image to unicode characters.
-    pub strategy: RatatuiCameraStrategy,
 }
 
 impl Default for RatatuiCamera {
@@ -28,15 +26,46 @@ impl Default for RatatuiCamera {
             dimensions: (256, 256),
             autoresize: false,
             autoresize_fn: |(w, h)| (w * 2, h * 2),
-            strategy: RatatuiCameraStrategy::default(),
         }
     }
 }
 
-/// Available strategies that can be used for converting the rendered image to unicode characters
-/// in the terminal buffer.
+impl RatatuiCamera {
+    pub fn new(dimensions: (u32, u32)) -> Self {
+        Self {
+            dimensions,
+            ..default()
+        }
+    }
+
+    pub fn autoresize() -> Self {
+        Self {
+            autoresize: true,
+            ..default()
+        }
+    }
+
+    pub fn with_dimensions(mut self, dimensions: (u32, u32)) -> Self {
+        self.dimensions = dimensions;
+        self
+    }
+
+    pub fn with_autoresize(mut self, autoresize: bool) -> Self {
+        self.autoresize = autoresize;
+        self
+    }
+
+    pub fn with_autoresize_fn(mut self, autoresize_fn: fn((u32, u32)) -> (u32, u32)) -> Self {
+        self.autoresize_fn = autoresize_fn;
+        self
+    }
+}
+
+/// Specify the strategy used for converting the camera's rendered image to unicode characters for
+/// the terminal buffer. Insert a variant of this component alongside your `RatatuiCamera` to
+/// change the default behavior.
 ///
-#[derive(Default, Clone)]
+#[derive(Component, Default, Clone)]
 pub enum RatatuiCameraStrategy {
     /// Print to the terminal using unicode halfblock characters. By using both the halfblock
     /// (foreground) color and the background color, we can draw two pixels per buffer cell.
@@ -48,27 +77,51 @@ pub enum RatatuiCameraStrategy {
     Luminance(LuminanceConfig),
 }
 
+impl RatatuiCameraStrategy {
+    /// Luminance strategy with a range of braille unicode characters in increasing order of opacity.
+    pub fn luminance_braille() -> Self {
+        Self::Luminance(LuminanceConfig {
+            luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_BRAILLE.into(),
+            ..default()
+        })
+    }
+
+    /// Luminance strategy with a range of miscellaneous characters in increasing order of opacity.
+    pub fn luminance_misc() -> Self {
+        Self::Luminance(LuminanceConfig {
+            luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_MISC.into(),
+            ..default()
+        })
+    }
+
+    /// Luminance strategy with a range of block characters in increasing order of opacity.
+    pub fn luminance_shading() -> Self {
+        Self::Luminance(LuminanceConfig {
+            luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_SHADING.into(),
+            ..default()
+        })
+    }
+}
+
 /// Configuration for the RatatuiCameraStrategy::Luminance terminal rendering strategy.
 ///
 /// # Example:
 ///
-/// The following would configure the plugin to use ' ' and '.' for dimmer areas, use '+' and '#'
-/// for brighter areas, and multiply each pixel's luminance value by 5.0:
+/// The following would configure the widget to multiply each pixel's luminance value by 5.0, use
+/// ' ' and '.' for dimmer areas, and use '+' and '#' for brighter areas:
 ///
 /// ```no_run
 /// # use bevy::prelude::*;
 /// # use bevy_ratatui_render::{RatatuiCamera, RatatuiCameraStrategy, LuminanceConfig};
 /// #
 /// # fn setup_scene_system(mut commands: Commands) {
-/// #   commands.spawn(
-/// RatatuiCamera {
-///     strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig {
+/// # commands.spawn((
+/// #     RatatuiCamera::default(),
+///     RatatuiCameraStrategy::Luminance(LuminanceConfig {
 ///         luminance_characters: vec![' ', '.', '+', '#'],
 ///         luminance_scale: 5.0,
 ///     }),
-///     ..default()
-/// }
-/// #   );
+/// # ));
 /// # };
 /// ```
 ///
@@ -99,7 +152,7 @@ impl LuminanceConfig {
     pub const LUMINANCE_CHARACTERS_SHADING: &'static [char] = &[' ', '░', '▒', '▓', '█'];
 
     /// The default scaling value to multiply pixel luminance by.
-    const LUMINANCE_SCALE_DEFAULT: f32 = 9.;
+    const LUMINANCE_SCALE_DEFAULT: f32 = 10.;
 }
 
 impl Default for LuminanceConfig {

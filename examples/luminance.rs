@@ -56,14 +56,11 @@ fn setup_scene_system(
     shared::spawn_3d_scene(&mut commands, &mut meshes, &mut materials);
 
     commands.spawn((
-        RatatuiCamera {
-            strategy: RatatuiCameraStrategy::Luminance(LuminanceConfig {
-                luminance_scale: 11.0,
-                ..default()
-            }),
-            autoresize: true,
+        RatatuiCamera::autoresize(),
+        RatatuiCameraStrategy::Luminance(LuminanceConfig {
+            luminance_scale: 11.0,
             ..default()
-        },
+        }),
         RatatuiCameraEdgeDetection {
             edge_color: Some(ratatui::style::Color::Magenta),
             thickness: 1.8,
