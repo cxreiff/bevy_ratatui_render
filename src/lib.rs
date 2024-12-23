@@ -8,6 +8,7 @@ mod plugin;
 mod widget;
 mod widget_halfblocks;
 mod widget_luminance;
+mod widget_none;
 
 pub use camera::{LuminanceConfig, RatatuiCamera, RatatuiCameraStrategy};
 pub use camera_edge_detection::{EdgeCharacters, RatatuiCameraEdgeDetection};

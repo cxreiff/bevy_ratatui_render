@@ -6,14 +6,14 @@ use ratatui::widgets::WidgetRef;
 
 use crate::{LuminanceConfig, RatatuiCameraEdgeDetection};
 
-pub struct RatatuiRenderWidgetLuminance<'a> {
+pub struct RatatuiCameraWidgetLuminance<'a> {
     camera_image: &'a DynamicImage,
     sobel_image: &'a Option<DynamicImage>,
     strategy_config: &'a LuminanceConfig,
     edge_detection: &'a Option<RatatuiCameraEdgeDetection>,
 }
 
-impl<'a> RatatuiRenderWidgetLuminance<'a> {
+impl<'a> RatatuiCameraWidgetLuminance<'a> {
     pub fn new(
         camera_image: &'a DynamicImage,
         sobel_image: &'a Option<DynamicImage>,
@@ -29,7 +29,7 @@ impl<'a> RatatuiRenderWidgetLuminance<'a> {
     }
 }
 
-impl WidgetRef for RatatuiRenderWidgetLuminance<'_> {
+impl WidgetRef for RatatuiCameraWidgetLuminance<'_> {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let Self {
             camera_image,
@@ -38,27 +38,27 @@ impl WidgetRef for RatatuiRenderWidgetLuminance<'_> {
             edge_detection,
         } = self;
 
-        let image = camera_image.resize(
+        let camera_image = camera_image.resize(
             area.width as u32,
             area.height as u32 * 2,
             FilterType::Nearest,
         );
 
         let render_area = Rect {
-            x: area.x + area.width.saturating_sub(image.width() as u16) / 2,
-            y: area.y + (area.height).saturating_sub(image.height() as u16 / 2) / 2,
-            width: image.width() as u16,
-            height: image.height() as u16 / 2,
+            x: area.x + area.width.saturating_sub(camera_image.width() as u16) / 2,
+            y: area.y + (area.height).saturating_sub(camera_image.height() as u16 / 2) / 2,
+            width: camera_image.width() as u16,
+            height: camera_image.height() as u16 / 2,
         };
 
         let color_characters = convert_image_to_color_characters(
-            &image,
+            &camera_image,
             &strategy_config.luminance_characters,
             strategy_config.luminance_scale,
         );
 
-        let image_sobel = sobel_image.as_ref().map(|image_sobel| {
-            image_sobel.resize(
+        let sobel_image = sobel_image.as_ref().map(|sobel_image| {
+            sobel_image.resize(
                 area.width as u32,
                 area.height as u32 * 2,
                 FilterType::Nearest,
@@ -66,18 +66,18 @@ impl WidgetRef for RatatuiRenderWidgetLuminance<'_> {
         });
 
         for (index, (mut character, mut color)) in color_characters.iter().enumerate() {
-            let x = index as u16 % image.width() as u16;
-            let y = index as u16 / image.width() as u16;
+            let x = index as u16 % camera_image.width() as u16;
+            let y = index as u16 / camera_image.width() as u16;
             if x >= render_area.width || y >= render_area.height {
                 continue;
             }
 
-            if let (Some(ref image_sobel), Some(edge_detection)) = (&image_sobel, edge_detection) {
-                if !image_sobel.in_bounds(x as u32, y as u32 * 2) {
+            if let (Some(ref sobel_image), Some(edge_detection)) = (&sobel_image, edge_detection) {
+                if !sobel_image.in_bounds(x as u32, y as u32 * 2) {
                     continue;
                 }
 
-                let sobel_value = image_sobel.get_pixel(x as u32, y as u32 * 2);
+                let sobel_value = sobel_image.get_pixel(x as u32, y as u32 * 2);
 
                 match edge_detection.edge_characters {
                     crate::EdgeCharacters::Directional {
@@ -124,11 +124,11 @@ impl WidgetRef for RatatuiRenderWidgetLuminance<'_> {
 }
 
 fn convert_image_to_color_characters(
-    image: &DynamicImage,
+    camera_image: &DynamicImage,
     luminance_characters: &[char],
     luminance_scale: f32,
 ) -> Vec<(char, Color)> {
-    let rgb_triplets = convert_image_to_rgb_triplets(image);
+    let rgb_triplets = convert_image_to_rgb_triplets(camera_image);
     let characters = rgb_triplets
         .iter()
         .map(|rgb| convert_rgb_triplet_to_character(rgb, luminance_characters, luminance_scale));
@@ -139,12 +139,13 @@ fn convert_image_to_color_characters(
     characters.zip(colors).collect()
 }
 
-fn convert_image_to_rgb_triplets(image: &DynamicImage) -> Vec<[u8; 3]> {
-    let mut rgb_triplets = vec![[0; 3]; (image.width() * image.height().div_ceil(2)) as usize];
+fn convert_image_to_rgb_triplets(camera_image: &DynamicImage) -> Vec<[u8; 3]> {
+    let mut rgb_triplets =
+        vec![[0; 3]; (camera_image.width() * camera_image.height().div_ceil(2)) as usize];
 
-    for (y, row) in image.to_rgb8().rows().enumerate() {
+    for (y, row) in camera_image.to_rgb8().rows().enumerate() {
         for (x, pixel) in row.enumerate() {
-            let position = x + (image.width() as usize) * (y / 2);
+            let position = x + (camera_image.width() as usize) * (y / 2);
             if y % 2 == 0 {
                 rgb_triplets[position] = pixel.0;
             } else {

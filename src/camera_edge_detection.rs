@@ -38,16 +38,16 @@ pub struct RatatuiCameraEdgeDetection {
 impl Default for RatatuiCameraEdgeDetection {
     fn default() -> Self {
         Self {
-            thickness: 1.4,
+            thickness: 2.0,
 
             color_enabled: true,
-            color_threshold: 0.2,
+            color_threshold: 0.4,
 
             depth_enabled: true,
-            depth_threshold: 0.05,
+            depth_threshold: 0.1,
 
             normal_enabled: true,
-            normal_threshold: 0.2,
+            normal_threshold: 2.5,
 
             edge_characters: EdgeCharacters::default(),
             edge_color: None,
@@ -74,12 +74,6 @@ pub enum EdgeCharacters {
 
 impl Default for EdgeCharacters {
     fn default() -> Self {
-        Self::Single('+')
-    }
-}
-
-impl EdgeCharacters {
-    pub fn lines() -> Self {
         Self::Directional {
             vertical: '|',
             horizontal: '―',

@@ -44,6 +44,7 @@ pub fn spawn_3d_scene(
     ));
     commands.spawn((
         PointLight {
+            intensity: 2_000_000.,
             shadows_enabled: true,
             ..Default::default()
         },

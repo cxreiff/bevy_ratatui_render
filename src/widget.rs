@@ -3,8 +3,9 @@ use image::DynamicImage;
 use ratatui::widgets::Widget;
 use ratatui::{prelude::*, widgets::WidgetRef};
 
-use crate::widget_halfblocks::RatatuiRenderWidgetHalfblocks;
-use crate::widget_luminance::RatatuiRenderWidgetLuminance;
+use crate::widget_halfblocks::RatatuiCameraWidgetHalfblocks;
+use crate::widget_luminance::RatatuiCameraWidgetLuminance;
+use crate::widget_none::RatatuiCameraWidgetNone;
 use crate::{RatatuiCameraEdgeDetection, RatatuiCameraStrategy};
 
 /// Ratatui widget that will be inserted into each RatatuiCamera containing entity and updated each
@@ -24,13 +25,21 @@ impl Widget for &RatatuiCameraWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         match self.strategy {
             RatatuiCameraStrategy::HalfBlocks => {
-                RatatuiRenderWidgetHalfblocks::new(&self.camera_image).render_ref(area, buf)
+                RatatuiCameraWidgetHalfblocks::new(&self.camera_image).render_ref(area, buf)
             }
             RatatuiCameraStrategy::Luminance(ref strategy_config) => {
-                RatatuiRenderWidgetLuminance::new(
+                RatatuiCameraWidgetLuminance::new(
                     &self.camera_image,
                     &self.sobel_image,
                     strategy_config,
+                    &self.edge_detection,
+                )
+                .render_ref(area, buf);
+            }
+            RatatuiCameraStrategy::None => {
+                RatatuiCameraWidgetNone::new(
+                    &self.camera_image,
+                    &self.sobel_image,
                     &self.edge_detection,
                 )
                 .render_ref(area, buf);

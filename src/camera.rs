@@ -74,6 +74,10 @@ pub enum RatatuiCameraStrategy {
     /// Given a range of unicode characters sorted in increasing order of opacity, use each pixel's
     /// luminance to select a character from the range.
     Luminance(LuminanceConfig),
+
+    /// Does not print characters by itself, but edge detection will still print. Use with edge
+    /// detection for a "wireframe" type look.
+    None,
 }
 
 impl RatatuiCameraStrategy {

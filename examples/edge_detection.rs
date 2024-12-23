@@ -56,14 +56,8 @@ fn setup_scene_system(
 
     commands.spawn((
         RatatuiCamera::autoresize(),
-        RatatuiCameraStrategy::luminance_misc(),
-        RatatuiCameraEdgeDetection {
-            edge_color: Some(ratatui::style::Color::Magenta),
-            thickness: 1.8,
-            normal_enabled: false,
-            color_enabled: false,
-            ..default()
-        },
+        RatatuiCameraStrategy::None,
+        RatatuiCameraEdgeDetection::default(),
         Camera3d::default(),
         Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),
     ));

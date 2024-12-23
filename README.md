@@ -93,8 +93,8 @@ commands.spawn((
 ## autoresize
 
 By default, the size of the texture the camera renders to will stay constant, and when rendered to the ratatui
-buffer it will be resized to fit the available area while retaining its aspect ratio. If you set the
-`autoresize` attribute to true, the render texture will instead be resized to fit the terminal window.
+buffer it will retain its aspect ratio. If you set the `autoresize` attribute to true, the render texture will
+be resized to fit the terminal window, including its aspect ratio.
 
 You can also supply an optional `autoresize_function` that converts the terminal dimensions to the dimensions
 that will be used for resizing. This is useful for situations when you want to maintain a specific aspect ratio
@@ -118,14 +118,18 @@ when the text rendering causes edges to blend together.
 
 Set `edge_characters` to `EdgeCharacters::Single(..)` for a single dedicated edge character, or set it to
 `EdgeCharacters::Directional { .. }` to set different characters based on the "direction" of the edge, for
-example using '-', '|', '/', '\' to draw edge "lines". Detecting the correct edge direction is an area of
-improvement for the current code, so you may need to experiment with color/depth/normal thresholds for good
-results.
+example using '―', '|', '⟋', and '⟍' characters to draw edge "lines". Detecting the correct edge direction
+is a bit fuzzy, so you may need to experiment with color/depth/normal thresholds for good results.
 
 ```rust
 RatatuiCameraEdgeDetection {
     thickness: 1.4,
-    edge_characters: EdgeCharacters::Single('+'),
+    edge_characters: Self::Directional {
+        vertical: '|',
+        horizontal: '―',
+        forward_diagonal: '⟋',
+        backward_diagonal: '⟍',
+    },
     edge_color: Some(ratatui::style::Color::Magenta),
     ..default()
 }
@@ -154,13 +158,4 @@ that the following terminals display correctly:
 |-------|---------------------|
 | 0.15  | 0.8                 |
 | 0.14  | 0.6                 |
-| 0.13  | 0.4                 |
 
-## credits
-
-* Headless rendering code adapted from bevy's
-[headless_render](https://github.com/bevyengine/bevy/blob/main/examples/app/headless_renderer.rs)
-example (@bugsweeper, @alice-i-cecile, @mockersf).
-* bevy's [many_foxes](https://github.com/bevyengine/bevy/blob/main/examples/stress_tests/many_foxes.rs)
-example used for example gif.
-* [bevy_sponza_scene](https://github.com/DGriffin91/bevy_sponza_scene) used for example gif.
