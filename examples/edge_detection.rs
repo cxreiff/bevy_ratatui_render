@@ -11,8 +11,8 @@ use bevy::winit::WinitPlugin;
 use bevy_ratatui::kitty::KittyEnabled;
 use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_camera::LuminanceConfig;
 use bevy_ratatui_camera::RatatuiCamera;
+use bevy_ratatui_camera::RatatuiCameraEdgeDetection;
 use bevy_ratatui_camera::RatatuiCameraPlugin;
 use bevy_ratatui_camera::RatatuiCameraStrategy;
 use bevy_ratatui_camera::RatatuiCameraWidget;
@@ -56,10 +56,14 @@ fn setup_scene_system(
 
     commands.spawn((
         RatatuiCamera::autoresize(),
-        RatatuiCameraStrategy::Luminance(LuminanceConfig {
-            luminance_scale: 11.0,
+        RatatuiCameraStrategy::luminance_misc(),
+        RatatuiCameraEdgeDetection {
+            edge_color: Some(ratatui::style::Color::Magenta),
+            thickness: 1.8,
+            normal_enabled: false,
+            color_enabled: false,
             ..default()
-        }),
+        },
         Camera3d::default(),
         Transform::from_xyz(2.5, 2.5, 2.5).looking_at(Vec3::ZERO, Vec3::Z),
     ));
