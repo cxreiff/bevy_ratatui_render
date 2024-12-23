@@ -34,7 +34,7 @@ use crate::{
 ///             // create windowless loop and set its frame rate.
 ///             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
 ///
-///             // set up the Ratatui context and forward input events.
+///             // set up the Ratatui context and forward terminal input events.
 ///             RatatuiPlugins::default(),
 ///
 ///             // add the ratatui camera plugin.

@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use bevy::app::ScheduleRunnerPlugin;
-use bevy::color::Color;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::log::LogPlugin;
 use bevy::prelude::*;

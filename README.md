@@ -110,7 +110,7 @@ RatatuiCamera {
 
 ## edge detection
 
-When using the `RatatuiCameraStrategy::Luminance` strategy, you can also optionally insert a
+When using the `RatatuiCameraStrategy::Luminance` strategy and a 3d camera, you can also optionally insert a
 `RatatuiCameraEdgeDetection` component into your camera in order to add an edge detection step in the render
 graph. When printing to the ratatui buffer, special characters and an override color can be used based on the
 detected edges and their directions. This can be useful for certain visual effects, and distinguishing detail
@@ -152,7 +152,7 @@ that the following terminals display correctly:
 
 | bevy  | bevy_ratatui_render |
 |-------|---------------------|
-| 0.15  | 0.7                 |
+| 0.15  | 0.8                 |
 | 0.14  | 0.6                 |
 | 0.13  | 0.4                 |
 
