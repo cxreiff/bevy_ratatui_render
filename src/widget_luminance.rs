@@ -1,34 +1,45 @@
 use bevy::color::Luminance;
 use image::imageops::FilterType;
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use ratatui::prelude::*;
 use ratatui::widgets::WidgetRef;
 
-pub struct RatatuiRenderWidgetLuminance {
-    image: DynamicImage,
-    sobel: Option<DynamicImage>,
-    config: LuminanceConfig,
+use crate::camera::LuminanceConfig;
+use crate::RatatuiCameraEdgeDetection;
+
+pub struct RatatuiRenderWidgetLuminance<'a> {
+    camera_image: &'a DynamicImage,
+    sobel_image: &'a Option<DynamicImage>,
+    strategy_config: &'a LuminanceConfig,
+    edge_detection: &'a Option<RatatuiCameraEdgeDetection>,
 }
 
-impl RatatuiRenderWidgetLuminance {
-    pub fn new(image: DynamicImage, sobel: Option<DynamicImage>, config: LuminanceConfig) -> Self {
+impl<'a> RatatuiRenderWidgetLuminance<'a> {
+    pub fn new(
+        camera_image: &'a DynamicImage,
+        sobel_image: &'a Option<DynamicImage>,
+        strategy_config: &'a LuminanceConfig,
+        edge_detection: &'a Option<RatatuiCameraEdgeDetection>,
+    ) -> Self {
         Self {
-            image,
-            sobel,
-            config,
+            camera_image,
+            sobel_image,
+            strategy_config,
+            edge_detection,
         }
     }
 }
 
-impl WidgetRef for RatatuiRenderWidgetLuminance {
+impl WidgetRef for RatatuiRenderWidgetLuminance<'_> {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let Self {
-            image,
-            sobel,
-            config,
+            camera_image,
+            sobel_image,
+            strategy_config,
+            edge_detection,
         } = self;
 
-        let image = image.resize(
+        let image = camera_image.resize(
             area.width as u32,
             area.height as u32 * 2,
             FilterType::Nearest,
@@ -43,52 +54,74 @@ impl WidgetRef for RatatuiRenderWidgetLuminance {
 
         let color_characters = convert_image_to_color_characters(
             &image,
-            &config.luminance_characters,
-            config.luminance_scale,
+            &strategy_config.luminance_characters,
+            strategy_config.luminance_scale,
         );
 
-        if let Some(_sobel) = sobel {
-            // TODO: handle replacing characters with line characters based on sobel filter.
-        }
+        let image_sobel = sobel_image.as_ref().map(|image_sobel| {
+            image_sobel.resize(
+                area.width as u32,
+                area.height as u32 * 2,
+                FilterType::Nearest,
+            )
+        });
 
-        for (index, (character, color)) in color_characters.iter().enumerate() {
+        for (index, (mut character, mut color)) in color_characters.iter().enumerate() {
             let x = index as u16 % image.width() as u16;
             let y = index as u16 / image.width() as u16;
             if x >= render_area.width || y >= render_area.height {
                 continue;
             }
 
-            buf.cell_mut((render_area.x + x, render_area.y + y))
-                .map(|cell| cell.set_fg(*color).set_char(*character));
+            if let (Some(ref image_sobel), Some(edge_detection)) = (&image_sobel, edge_detection) {
+                if !image_sobel.in_bounds(x as u32, y as u32 * 2) {
+                    continue;
+                }
+
+                let sobel_value = image_sobel.get_pixel(x as u32, y as u32 * 2);
+
+                match edge_detection.edge_characters {
+                    crate::EdgeCharacters::Directional {
+                        vertical,
+                        horizontal,
+                        forward_diagonal,
+                        backward_diagonal,
+                    } => {
+                        let is_max_sobel = |current: u8| {
+                            sobel_value
+                                .0
+                                .iter()
+                                .all(|val| (current > 0) && (current >= *val))
+                        };
+
+                        if is_max_sobel(sobel_value[0]) {
+                            character = vertical;
+                            color = edge_detection.edge_color.unwrap_or(color);
+                        } else if is_max_sobel(sobel_value[1]) {
+                            character = horizontal;
+                            color = edge_detection.edge_color.unwrap_or(color);
+                        } else if is_max_sobel(sobel_value[2]) {
+                            character = forward_diagonal;
+                            color = edge_detection.edge_color.unwrap_or(color);
+                        } else if is_max_sobel(sobel_value[3]) {
+                            character = backward_diagonal;
+                            color = edge_detection.edge_color.unwrap_or(color);
+                        }
+                    }
+                    crate::EdgeCharacters::Single(edge_character) => {
+                        if sobel_value.0.iter().any(|val| *val > 0) {
+                            character = edge_character;
+                            color = edge_detection.edge_color.unwrap_or(color);
+                        }
+                    }
+                }
+            };
+
+            if let Some(cell) = buf.cell_mut((render_area.x + x, render_area.y + y)) {
+                cell.set_fg(color).set_char(character);
+            }
         }
     }
-}
-
-#[derive(Clone)]
-pub struct LuminanceConfig {
-    pub luminance_characters: Vec<char>,
-    pub luminance_scale: f32,
-    pub edge_detection: bool,
-}
-
-impl Default for LuminanceConfig {
-    fn default() -> Self {
-        Self {
-            luminance_characters: LuminanceConfig::LUMINANCE_CHARACTERS_DEFAULT.into(),
-            luminance_scale: LuminanceConfig::LUMINANCE_SCALE_DEFAULT,
-            edge_detection: false,
-        }
-    }
-}
-
-impl LuminanceConfig {
-    pub const LUMINANCE_CHARACTERS_DEFAULT: &'static [char] =
-        &[' ', '.', ':', '+', '=', '!', '*', '?', '#', '%', '&', '@'];
-
-    pub const LUMINANCE_CHARACTERS_BRAILLE: &'static [char] =
-        &['⠁', '⠉', '⠋', '⠛', '⠟', '⠿', '⡿', '⣿'];
-
-    const LUMINANCE_SCALE_DEFAULT: f32 = 9.;
 }
 
 fn convert_image_to_color_characters(
@@ -116,9 +149,12 @@ fn convert_image_to_rgb_triplets(image: &DynamicImage) -> Vec<[u8; 3]> {
             if y % 2 == 0 {
                 rgb_triplets[position] = pixel.0;
             } else {
-                rgb_triplets[position][0] = (rgb_triplets[position][0] + pixel[0]) / 2;
-                rgb_triplets[position][1] = (rgb_triplets[position][1] + pixel[1]) / 2;
-                rgb_triplets[position][2] = (rgb_triplets[position][2] + pixel[2]) / 2;
+                rgb_triplets[position][0] =
+                    (rgb_triplets[position][0].saturating_add(pixel[0])) / 2;
+                rgb_triplets[position][1] =
+                    (rgb_triplets[position][1].saturating_add(pixel[1])) / 2;
+                rgb_triplets[position][2] =
+                    (rgb_triplets[position][2].saturating_add(pixel[2])) / 2;
             }
         }
     }

@@ -1,56 +1,39 @@
-use bevy::image::Image;
+use bevy::prelude::Component;
+use image::DynamicImage;
 use ratatui::widgets::Widget;
 use ratatui::{prelude::*, widgets::WidgetRef};
 
-use crate::{RatatuiRenderStrategy, RatatuiRenderWidgetHalfblocks, RatatuiRenderWidgetLuminance};
+use crate::widget_halfblocks::RatatuiRenderWidgetHalfblocks;
+use crate::widget_luminance::RatatuiRenderWidgetLuminance;
+use crate::{RatatuiCameraEdgeDetection, RatatuiCameraStrategy};
 
-pub struct RatatuiRenderWidget<'a, 'b, 'c> {
-    image: &'a Image,
-    sobel: &'b Option<Image>,
-    strategy: &'c RatatuiRenderStrategy,
+/// Ratatui widget that will be inserted into each RatatuiCamera containing entity and updated each
+/// frame with the last image rendered by the camera. When drawn in a ratatui buffer, it will use
+/// the RatatuiCamera's specified RatatuiCameraStrategy to convert the rendered image to unicode
+/// characters, and will draw them in the buffer.
+///
+#[derive(Component)]
+pub struct RatatuiCameraWidget {
+    pub camera_image: DynamicImage,
+    pub sobel_image: Option<DynamicImage>,
+    pub strategy: RatatuiCameraStrategy,
+    pub edge_detection: Option<RatatuiCameraEdgeDetection>,
 }
 
-impl<'a, 'b, 'c> RatatuiRenderWidget<'a, 'b, 'c> {
-    pub fn new(
-        image: &'a Image,
-        sobel: &'b Option<Image>,
-        strategy: &'c RatatuiRenderStrategy,
-    ) -> Self {
-        Self {
-            image,
-            sobel,
-            strategy,
-        }
-    }
-}
-
-impl Widget for RatatuiRenderWidget<'_, '_, '_> {
+impl Widget for &RatatuiCameraWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let Self {
-            image,
-            sobel,
-            strategy,
-        } = self;
-
-        let image = match image.clone().try_into_dynamic() {
-            Ok(image) => image,
-            Err(e) => panic!("failed to create image buffer {e:?}"),
-        };
-
-        let sobel = sobel
-            .as_ref()
-            .map(|sobel| match sobel.clone().try_into_dynamic() {
-                Ok(sobel) => sobel,
-                Err(e) => panic!("failed to create sobel buffer {e:?}"),
-            });
-
-        match strategy {
-            RatatuiRenderStrategy::Halfblocks => {
-                RatatuiRenderWidgetHalfblocks::new(image).render_ref(area, buf)
+        match self.strategy {
+            RatatuiCameraStrategy::HalfBlocks => {
+                RatatuiRenderWidgetHalfblocks::new(&self.camera_image).render_ref(area, buf)
             }
-            RatatuiRenderStrategy::Luminance(luminance_config) => {
-                RatatuiRenderWidgetLuminance::new(image, sobel, luminance_config.clone())
-                    .render_ref(area, buf);
+            RatatuiCameraStrategy::Luminance(ref strategy_config) => {
+                RatatuiRenderWidgetLuminance::new(
+                    &self.camera_image,
+                    &self.sobel_image,
+                    strategy_config,
+                    &self.edge_detection,
+                )
+                .render_ref(area, buf);
             }
         }
     }
