@@ -1,4 +1,4 @@
-# bevy_ratatui_render
+# bevy_ratatui_camera
 
 Bevy inside the terminal!
 
@@ -22,7 +22,7 @@ and receiving terminal events (keyboard, focus, mouse, paste, resize) inside bev
 
 ## getting started
 
-`cargo add bevy_ratatui_render bevy_ratatui`
+`cargo add bevy_ratatui_camera bevy_ratatui`
 
 ```rust
 fn main() {
@@ -150,7 +150,7 @@ that the following terminals display correctly:
 
 ## compatibility
 
-| bevy  | bevy_ratatui_render |
+| bevy  | bevy_ratatui_camera |
 |-------|---------------------|
 | 0.15  | 0.8                 |
 | 0.14  | 0.6                 |

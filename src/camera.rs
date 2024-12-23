@@ -111,7 +111,7 @@ impl RatatuiCameraStrategy {
 ///
 /// ```no_run
 /// # use bevy::prelude::*;
-/// # use bevy_ratatui_render::{RatatuiCamera, RatatuiCameraStrategy, LuminanceConfig};
+/// # use bevy_ratatui_camera::{RatatuiCamera, RatatuiCameraStrategy, LuminanceConfig};
 /// #
 /// # fn setup_scene_system(mut commands: Commands) {
 /// # commands.spawn((

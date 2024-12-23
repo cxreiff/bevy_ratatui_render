@@ -4,8 +4,7 @@ use image::{DynamicImage, GenericImageView};
 use ratatui::prelude::*;
 use ratatui::widgets::WidgetRef;
 
-use crate::camera::LuminanceConfig;
-use crate::RatatuiCameraEdgeDetection;
+use crate::{LuminanceConfig, RatatuiCameraEdgeDetection};
 
 pub struct RatatuiRenderWidgetLuminance<'a> {
     camera_image: &'a DynamicImage,

@@ -20,7 +20,7 @@ use crate::{
 /// # use bevy::log::LogPlugin;
 /// # use bevy_ratatui::RatatuiPlugins;
 /// # use bevy_ratatui::terminal::RatatuiContext;
-/// # use bevy_ratatui_render::{RatatuiCamera, RatatuiCameraPlugin, RatatuiCameraWidget};
+/// # use bevy_ratatui_camera::{RatatuiCamera, RatatuiCameraPlugin, RatatuiCameraWidget};
 /// #
 /// fn main() {
 ///     App::new()

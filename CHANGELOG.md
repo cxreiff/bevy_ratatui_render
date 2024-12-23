@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.6.0...v0.7.0) - 2024-12-05
+## [0.7.0](https://github.com/cxreiff/bevy_ratatui_camera/compare/v0.6.0...v0.7.0) - 2024-12-05
 
 ### Added
 
@@ -17,13 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump ruzstd from 0.7.0 to 0.7.3 in the cargo group across 1 directory
 - updated README for version bump
 
-## [0.5.8](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.7...v0.5.8) - 2024-10-11
+## [0.5.8](https://github.com/cxreiff/bevy_ratatui_camera/compare/v0.5.7...v0.5.8) - 2024-10-11
 
 ### Other
 
 - disable LogPlugin in docs and examples
 
-## [0.5.7](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.6...v0.5.7) - 2024-10-11
+## [0.5.7](https://github.com/cxreiff/bevy_ratatui_camera/compare/v0.5.6...v0.5.7) - 2024-10-11
 
 ### Other
 
@@ -31,12 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - version upgrades
 - update docs and examples to remove WinitPlugin
 
-## [0.5.6](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.5...v0.5.6) - 2024-08-15
+## [0.5.6](https://github.com/cxreiff/bevy_ratatui_camera/compare/v0.5.5...v0.5.6) - 2024-08-15
 
 ### Other
 - version bumps, workflow updates
 
-## [0.5.5](https://github.com/cxreiff/bevy_ratatui_render/compare/v0.5.4...v0.5.5) - 2024-08-07
+## [0.5.5](https://github.com/cxreiff/bevy_ratatui_camera/compare/v0.5.4...v0.5.5) - 2024-08-07
 
 ### Other
 - re-added workflows

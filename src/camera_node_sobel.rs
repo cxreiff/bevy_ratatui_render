@@ -239,7 +239,7 @@ impl FromWorld for RatatuiCameraNodeSobelPipeline {
 
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
-        let path = Path::new("bevy_ratatui_render").join("shaders/sobel.wgsl");
+        let path = Path::new("bevy_ratatui_camera").join("shaders/sobel.wgsl");
         let source = AssetSourceId::from("embedded");
         let asset_path = AssetPath::from_path(&path).with_source(source);
         let shader_handle: Handle<Shader> = world.load_asset(asset_path);

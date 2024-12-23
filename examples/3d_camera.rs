@@ -10,9 +10,9 @@ use bevy::winit::WinitPlugin;
 use bevy_ratatui::kitty::KittyEnabled;
 use bevy_ratatui::terminal::RatatuiContext;
 use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_render::RatatuiCamera;
-use bevy_ratatui_render::RatatuiCameraPlugin;
-use bevy_ratatui_render::RatatuiCameraWidget;
+use bevy_ratatui_camera::RatatuiCamera;
+use bevy_ratatui_camera::RatatuiCameraPlugin;
+use bevy_ratatui_camera::RatatuiCameraWidget;
 
 mod shared;
 
