@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_ratatui_camera"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "bevy",
  "bevy_mod_debugdump",
